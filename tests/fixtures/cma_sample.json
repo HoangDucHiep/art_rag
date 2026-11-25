@@ -1,0 +1,571 @@
+[
+  {
+    "id": 151904,
+    "title": "The Biglin Brothers Turning the Stake",
+    "creation_date": "1873",
+    "date_text": "1873",
+    "creation_date_earliest": 1873,
+    "creation_date_latest": 1873,
+    "culture": [
+      "United States"
+    ],
+    "department": "American Painting and Sculpture",
+    "technique": "oil on canvas",
+    "type": "Painting",
+    "creditline": "Hinman B. Hurlbut Collection",
+    "current_location": "207 American Realism",
+    "accession_number": "1927.1984",
+    "url": "https://clevelandart.org/art/1927.1984",
+    "description": "Eakins's painting celebrates athletic teamwork while commemorating an actual event, a famous rowing race that took place on the Schuylkill River in Philadelphia during May 1872. Throngs of spectators line the riverbank and watch as Barney and John Biglin negotiate the tricky turn around a stake marking the halfway point in the contest. Their competitors, seen in the middle distance at the right, lag behind. The Biglin brothers won the race, cementing their status as the most celebrated oarsmen of the era. Trained in the United States and France, Eakins spent almost his entire artistic career in his hometown of Philadelphia. He is renowned for the unsentimental realism in his paintings, whose compositions he developed through painstakingly prepared figure and perspective drawings.",
+    "did_you_know": "Rowing was among the most popular spectator sports in the U.S. during the 1870s.",
+    "provenance": [
+      {
+        "description": "Susan MacDowell Eakins [1851-1938], Philadelphia, sold to the Cleveland Museum of Art",
+        "citations": [],
+        "footnotes": [
+          "<div><!--block-->Ownership of Eakins' unsold works passed to his wife, Susan Macdowell Eakins, upon his death in 1916.</div>"
+        ],
+        "date": "1916-1927",
+        "sortorder": 1
+      },
+      {
+        "description": "The Cleveland Museum of Art, Cleveland, OH",
+        "citations": [],
+        "footnotes": [],
+        "date": "1927-",
+        "sortorder": 2
+      }
+    ],
+    "exhibitions": {
+      "current": [
+        {
+          "id": 312517,
+          "title": "The Twentieth Anniversary Exhibition: The Official Art Exhibit of the Great Lakes Exposition",
+          "description": "<i>The Twentieth Anniversary Exhibition: The Official Art Exhibit of the Great Lakes Exposition</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (June 26-October 4, 1936).",
+          "opening_date": "1936-06-26T04:00:00"
+        },
+        {
+          "id": 312462,
+          "title": "Exhibition of American Painting from 1860 Until Today",
+          "description": "<i>Exhibition of American Painting from 1860 Until Today</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (June 23-October 4, 1937).",
+          "opening_date": "1937-06-23T04:00:00"
+        },
+        {
+          "id": 312341,
+          "title": "The Silver Jubilee Exhibition",
+          "description": "<i>The Silver Jubilee Exhibition</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (June 23-September 28, 1941).",
+          "opening_date": "1941-06-23T04:00:00"
+        },
+        {
+          "id": 311898,
+          "title": "35th Anniversary Exhibition",
+          "description": "<i>35th Anniversary Exhibition</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (June 20-September 30, 1951).",
+          "opening_date": "1951-06-20T04:00:00"
+        },
+        {
+          "id": 445590,
+          "title": "Thomas Eakins: Retrospective Exhibition",
+          "description": "<i>Thomas Eakins: Retrospective Exhibition</i>. Whitney Museum of American Art, New York, NY (organizer) (September 21-November 21, 1970).",
+          "opening_date": "1970-09-21T04:00:00"
+        },
+        {
+          "id": 302330,
+          "title": "Heritage and Horizon: American Painting 1776 - 1976",
+          "description": "<i>Heritage and Horizon: American Painting 1776 - 1976</i>. Buffalo AKG Art Museum, Buffalo, NY (organizer) (March 7-April 11, 1976); The Detroit Institute of Arts, Detroit, MI (May 2-June 13, 1976); The Toledo Museum of Art, Toledo, OH (July 4-August 15, 1976); The Cleveland Museum of Art, Cleveland, OH (September 8-October 10, 1976).",
+          "opening_date": "1976-03-07T05:00:00"
+        },
+        {
+          "id": 205372,
+          "title": "Thomas Eakins: The Rowing Pictures",
+          "description": "<i>Thomas Eakins: The Rowing Pictures</i>. National Gallery of Art (June 23-September 29, 1996); Yale University Art Gallery (organizer) (October 11, 1996-January 14, 1997); The Cleveland Museum of Art, Cleveland, OH (February 19-May 15, 1997).",
+          "opening_date": "1996-06-23T00:00:00"
+        },
+        {
+          "id": 205787,
+          "title": "Thomas Eakins, American Realist",
+          "description": "<i>Thomas Eakins, American Realist</i>. Philadelphia Museum of Art, Philadelphia, PA (organizer) (September 30, 2001-January 6, 2002); Musée d'Orsay, Paris, France (February 3-May 12, 2002); The Metropolitan Museum of Art, New York, NY (June 10-September 15, 2002).",
+          "opening_date": "2001-09-20T00:00:00"
+        },
+        {
+          "id": 184052,
+          "title": "Cleveland Collects American Art of the Gilded Age",
+          "description": "<i>Cleveland Collects American Art of the Gilded Age</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (February 23-May 18, 2003).",
+          "opening_date": "2003-02-23T00:00:00"
+        },
+        {
+          "id": 224558,
+          "title": "Time Stands Still: Muybridge and the Instantaneous Photography Movement",
+          "description": "<i>Time Stands Still: Muybridge and the Instantaneous Photography Movement</i>. The Cleveland Museum of Art, Cleveland, OH (February 15-May 16, 2004).",
+          "opening_date": "2004-02-15T00:00:00"
+        },
+        {
+          "id": 179631,
+          "title": "CMA Highlights",
+          "description": "<i>CMA Highlights</i>. The Cleveland Museum of Art (organizer) (June 21-September 11, 2005).",
+          "opening_date": "2005-06-21T00:00:00"
+        },
+        {
+          "id": 216543,
+          "title": "Manly Pursuits: The Sporting Images of Thomas Eakins",
+          "description": "<i>Manly Pursuits: The Sporting Images of Thomas Eakins</i>. Los Angeles County Museum of Art, Los Angeles, CA (organizer) (July 25-October 23, 2010).",
+          "opening_date": "2010-07-25T00:00:00"
+        }
+      ],
+      "legacy": [
+        {
+          "description": "Long Branch, NJ, unknown location (Summer, 1878) as Biglen Brothers turning the Stake-boat; see Thomas Eakins: The Rowing Pictures (Washington, D.C, 1996).",
+          "opening_date": "1996-01-01T00:00:00"
+        },
+        {
+          "description": "Boston, Charitable Mechanics Association, 13th Exhibition (2 September-2 November 1878) as Turning the Stake; see Thomas Eakins: The Rowing Pictures (Washington, D.C, 1996).",
+          "opening_date": "1996-01-01T00:00:00"
+        },
+        {
+          "description": "Philadelphia, Philadelphia Society of Artists, 2nd Annual Exhibition (1 November-6 December 1880) as Turning the Stake, A pair oared Race; see Thomas Eakins: The Rowing Pictures (Washington, D.C, 1996).",
+          "opening_date": "1996-01-01T00:00:00"
+        },
+        {
+          "description": "St. Louis, Art Hall, 21st St. Louis Fair, (3-8 October 1881) as Turning the Stake-boat; see Thomas Eakins: The Rowing Pictures (Washington, D.C, 1996).",
+          "opening_date": "1996-01-01T00:00:00"
+        },
+        {
+          "description": "Denver, National Mining and Industrial Exposition, 1st Annual Exposition (1 August-30 September 1882) as Biglen Brothers turning the Stake-boat; see Thomas Eakins: The Rowing Pictures (Washington, D.C, 1996).",
+          "opening_date": "1996-01-01T00:00:00"
+        },
+        {
+          "description": "New York, The Metropolitan Museum of Art, Loan Exhibition of the Works of Thomas Eakins (5 November-3 December 1917), illus. cat. no. 3, pl. 3 as The Biglin Brothers Turning the Stake-Boat.",
+          "opening_date": "1917-11-05T00:00:00"
+        },
+        {
+          "description": "Philadelphia, The Pennsylvania Academy of the Fine Arts, Memorial Exhibition of the Works of the Late Thomas Eakins (23 December 1917-13 January 1918), illus. cat. no. 33, listed p. 86.",
+          "opening_date": "1917-12-23T00:00:00"
+        },
+        {
+          "description": "Philadelphia, Department of Fine Arts, Paintings, Sculpture, and Prints in the Department of Fine Arts Sesqui-centennial International Exposition (1926), listed cat. no. 360, p. 70.",
+          "opening_date": "1926-01-01T00:00:00"
+        },
+        {
+          "description": "Cleveland, The Cleveland Museum of Art, Memorial Exhibition of Paintings by Thomas Eakins, Albert P. Ryder, and J. Alden Weir (15 December 1927-23 January 1928)",
+          "opening_date": "1927-12-15T00:00:00"
+        },
+        {
+          "description": "Philadelphia, PA, Pennsylvania Museum of Art, Work of Thomas Eakins (March 1930) New York, The Museum of Modern Art, Sixth Loan Exhibition: Winslow Homer, Albert P. Ryder, Thomas Eakins (May, 1930), illus. cat. no. 94, listed p. 29.",
+          "opening_date": "1930-03-01T00:00:00"
+        },
+        {
+          "description": "Los Angeles, Los Angeles Museum of History, Science, and Art, Olympic Competition and Exhibition of Art (30 July 30-31 August 1932), listed cat. no. 753, p. 51.",
+          "opening_date": "1931-07-30T00:00:00"
+        },
+        {
+          "description": "New York, Whitney Museum of American Art, American Genre: The Social Scene in Paintings and Prints (26 March-29 April 1935) cat. no. 28, listed p. 16, not illus.",
+          "opening_date": "1935-03-26T00:00:00"
+        },
+        {
+          "description": "Baltimore, The Baltimore Museum of Art, Thomas Eakins 1844-1916: A Retrospective Exhibition of His Paintings (1 December 1936-1 January 1937), illus. cat. no. 5.",
+          "opening_date": "1936-12-01T00:00:00"
+        },
+        {
+          "description": "Detroit, Detroit Institute of Art, Eighteenth Annual Exhibition of American Art (2 April-3 May 1937) cat. no. 1, listed p. 8, not illus.",
+          "opening_date": "1937-04-02T00:00:00"
+        },
+        {
+          "description": "New York, National Academy of Design, The Special World's Fair Exhibition (8 May-25 July 1939), listed cat. no.213.",
+          "opening_date": "1939-05-08T00:00:00"
+        },
+        {
+          "description": "San Francisco, The California Palace of the Legion of Honor, Seven Centuries of Painting: A Loan Exhibition of Old and Modern Masters (29 December 1939 - 28 January 1940), illus. cat. no. L-153, listed p. 50.",
+          "opening_date": "1939-12-29T00:00:00"
+        },
+        {
+          "description": "Detroit, The Detroit Institute of Arts, Five Centuries of Marine Painting (6 March-5 April 1942), listed no. 117, pp. 37-38, not illus.",
+          "opening_date": "1942-03-06T00:00:00"
+        },
+        {
+          "description": "Philadelphia, Philadelphia Museum of Art, Thomas Eakins Centennial Exhibitions (8 April-14 May, 1944), illus. cat. no. 17, p. 123, listed p. 134.",
+          "opening_date": "1944-04-08T00:00:00"
+        },
+        {
+          "description": "New York, M. Knoedler &amp; Company, A Loan Exhibition of the Works of Thomas Eakins 1844-1944, Commemorating the Centennial of His Birth (3 June-31 July 1944) illus. cat. no. 6.",
+          "opening_date": "1944-06-03T00:00:00"
+        },
+        {
+          "description": "Boston, Museum of Fine Arts, Boston Sport in American Art (10 October-10 December 1944), listed cat. no. 26, p.11, not illus.",
+          "opening_date": "1944-10-10T00:00:00"
+        },
+        {
+          "description": "Pittsburgh, Department of Fine Arts, Carnegie Institute, Thomas Eakins: Centennial Exhibition 1844-1944 (26 April-1 June 1945), illus. cat. no. 110.",
+          "opening_date": "1945-04-26T00:00:00"
+        },
+        {
+          "description": "London, The Tate Gallery, American Painting: From the Eighteenth Century to the Present Day (June - July 1946), illus. cat. no. 70, listed p. 12.",
+          "opening_date": "1946-06-01T00:00:00"
+        },
+        {
+          "description": "Saginaw Museum, Michigan, (2-28 November 1948), Thomas Eakins Centennial, no catalogue can be found for this show.",
+          "opening_date": "1948-11-02T00:00:00"
+        },
+        {
+          "description": "New York, NY, The Century Association, Exhibition of Paintings by Thomas Eakins (10 January-18 February 1951) no catalogue can be found for this show.",
+          "opening_date": "1951-01-10T00:00:00"
+        },
+        {
+          "description": "Akron, OH, Akron Art Institute, Masterpiece Series ( 30 December 1952-1 February 1953) no catalogue.",
+          "opening_date": "1952-12-30T00:00:00"
+        },
+        {
+          "description": "New York, Wildenstein &amp; Co., Landmarks in American Art, 1670-1950 (26 February-28 March 1953), illus. cat. no. 25, pl. 25 as The Biglen Brothers Turning the Stake.",
+          "opening_date": "1953-02-26T00:00:00"
+        },
+        {
+          "description": "Syracuse, Syracuse Museum of Fine Arts, 125 Years of American Art (16 September-11 October 1953), illus. cat . no. no. 18 as Turning the Stake Boat.",
+          "opening_date": "1953-09-16T00:00:00"
+        },
+        {
+          "description": "Philadelphia, Pennsylvania Academy of Fine Arts, 150th Anniversary Exhibition (15 January-13 March 1955); listed p. 65, cat. no. 74, not illus.",
+          "opening_date": "1955-01-15T00:00:00"
+        },
+        {
+          "description": "Washington, DC, National Gallery of Art, Smithsonian Institution, Thomas Eakins: A Retrospective Exhibition (8 October-12 November 1961); traveled to Chicago, The Art Institute of Chicago (1 December 1961-7 January 1962); to Philadelphia, Philadelphia Museum of Art (1 February-18 March 1962), illus. cat. no. 9, p. 43.",
+          "opening_date": "1961-10-08T00:00:00"
+        },
+        {
+          "description": "New York, Whitney Museum of Art, Thomas Eakins: Retrospective Exhibition (22 September-21 November 1970), illus. cat. no. 10, p. 37, listed p. 69.",
+          "opening_date": "1970-09-22T00:00:00"
+        },
+        {
+          "description": "Buffalo, Albright-Knox Art Gallery, Heritage and Horizon: American Painting 1776-1976 (6 March- 11 April 1976); traveled to Detroit, The Detroit Institute of Arts (5 May-13 June 1976); to Toledo, The Toledo Museum of Art (4 July-15 August 1976); to Cleveland, The Cleveland Museum of Art (8 September-10 October 1976), illus. cat. no. 22, illus.",
+          "opening_date": "1976-03-06T00:00:00"
+        },
+        {
+          "description": "Philadelphia, Philadelphia Museum of Art, Thomas Eakins Exhibition: Artist of Philadelphia (29 May-1 August 1982); traveled to Boston, Museum of Fine Arts, Boston (22 September-28 November 1982), illus. cat. no. 18, p. 22, illus.",
+          "opening_date": "1982-05-29T00:00:00"
+        },
+        {
+          "description": "Boston, Museum of Fine Arts, Boston A New World: Masterpieces of American Paintings 1760-1910 (7 September-13 November 1983); traveled to Washington, DC, Corcoran Gallery of American Art (7 December 1983-12 February 1984); to Paris, Grand Palais (16 March-11 June 1984) illus. cat. no. 58, p. 118, pp. 267-268, illus. p. 267.",
+          "opening_date": "1983-09-07T00:00:00"
+        },
+        {
+          "description": "The Cleveland Museum of Art (06/21/2005 - 09/11/2005); \"CMA Highlights\"",
+          "opening_date": "2005-06-21T00:00:00"
+        }
+      ]
+    },
+    "images": {
+      "annotation": "",
+      "web": {
+        "url": "https://openaccess-cdn.clevelandart.org/1927.1984/1927.1984_web.jpg",
+        "width": "1263",
+        "height": "835",
+        "filesize": "780656",
+        "filename": "1927.1984_web.jpg"
+      },
+      "print": {
+        "url": "https://openaccess-cdn.clevelandart.org/1927.1984/1927.1984_print.jpg",
+        "width": "3400",
+        "height": "2247",
+        "filesize": "5271592",
+        "filename": "1927.1984_print.jpg"
+      },
+      "full": {
+        "url": "https://openaccess-cdn.clevelandart.org/1927.1984/1927.1984_full.tif",
+        "width": "7164",
+        "height": "4735",
+        "filesize": "101799424",
+        "filename": "1927.1984_full.tif"
+      }
+    },
+    "creators": [
+      {
+        "id": 4037,
+        "description": "Thomas Eakins (American, 1844–1916)",
+        "extent": null,
+        "qualifier": null,
+        "role": "artist",
+        "biography": null,
+        "name_in_original_language": null,
+        "birth_year": "1844",
+        "death_year": "1916",
+        "use_in_caption": true,
+        "include_extent": false,
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": 146195,
+    "title": "Babur meeting with Sultan Ali Mirza at the Kohik River, from a Babur-nama (Memoirs of Babur)",
+    "creation_date": "c. 1590",
+    "date_text": "c. 1590",
+    "creation_date_earliest": 1585,
+    "creation_date_latest": 1595,
+    "culture": [
+      "India, Mughal, 16th century, made for Akbar (reigned 1556–1605)"
+    ],
+    "department": "Indian and Southeast Asian Art",
+    "technique": "Gum tempera and gold on paper",
+    "type": "Painting",
+    "creditline": "Andrew R. and Martha Holden Jennings Fund",
+    "current_location": null,
+    "accession_number": "1971.85",
+    "url": "https://clevelandart.org/art/1971.85",
+    "description": "Thirty years before he captured Delhi and founded the Mughal Empire, Babur began his expansionist activities at the age of 13, as depicted in this painting of an encounter that took place in 1496. Having traveled long distances across harsh dry terrain, Babur confronted one of his rivals who, like him, was angling to march on and conquer the illustrious city of Samarkand, the former capital of his ancestor Timur.",
+    "did_you_know": "Camels carry collapsed tents to be pitched for nightly encampments and parties.",
+    "provenance": [],
+    "exhibitions": {
+      "current": [
+        {
+          "id": 203111,
+          "title": "Art and Stories from Mughal India",
+          "description": "<i>Art and Stories from Mughal India</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (July 31-October 23, 2016).",
+          "opening_date": "2016-07-31T04:00:00"
+        }
+      ],
+      "legacy": [
+        {
+          "description": "Indian Miniature Rotation (Gallery 115); August 13, 2003 - February 18, 2004.",
+          "opening_date": "2003-08-13T00:00:00"
+        },
+        {
+          "description": "Indian Minature Rotation (Gallery 115); August 18, 2004 -",
+          "opening_date": "2004-08-18T00:00:00"
+        }
+      ]
+    },
+    "images": {
+      "annotation": null,
+      "web": {
+        "url": "https://openaccess-cdn.clevelandart.org/1971.85/1971.85_web.jpg",
+        "width": "610",
+        "height": "900",
+        "filesize": "276530",
+        "filename": "1971.85_web.jpg"
+      },
+      "print": {
+        "url": "https://openaccess-cdn.clevelandart.org/1971.85/1971.85_print.jpg",
+        "width": "2305",
+        "height": "3400",
+        "filesize": "2658879",
+        "filename": "1971.85_print.jpg"
+      },
+      "full": {
+        "url": "https://openaccess-cdn.clevelandart.org/1971.85/1971.85_full.tif",
+        "width": "5205",
+        "height": "7676",
+        "filesize": "119896508",
+        "filename": "1971.85_full.tif"
+      }
+    },
+    "creators": []
+  },
+  {
+    "id": 113945,
+    "title": "Cloudy Mountains",
+    "creation_date": "1130",
+    "date_text": "1130",
+    "creation_date_earliest": 1130,
+    "creation_date_latest": 1130,
+    "culture": [
+      "China, Southern Song dynasty (1127–1279)"
+    ],
+    "department": "Chinese Art",
+    "technique": "Handscroll; ink and color on silk",
+    "type": "Painting",
+    "creditline": "Purchase from the J. H. Wade Fund",
+    "current_location": null,
+    "accession_number": "1933.220",
+    "url": "https://clevelandart.org/art/1933.220",
+    "description": "<em>Cloudy Mountains</em> captures the view of a lush and misty riverscape, an impression of Mi Youren’s new environment, painted in a moment of peace. <br><br>With the fall of the Northern Song dynasty in 1127 upon the Jurchen’s military invasion, Mi Youren fled south across the Yangzi River. In 1130, he had reached Xinchang in Zhejiang province and thanked his host with this painting for having given him shelter. <br><br>Mi Youren was the oldest son of the art critic Mi Fu (1051– 1107); both developed a distinct style of mountain scenery by accumulating wet ink dots that create a hazy atmosphere.",
+    "did_you_know": "This scroll is one of the museum’s earliest dated Chinese paintings.",
+    "provenance": [
+      {
+        "description": "Zigu 子榖 [mid-1600s]",
+        "citations": [],
+        "footnotes": null,
+        "date": null,
+        "sortorder": 1
+      },
+      {
+        "description": "Xisan 錫三 of Yang xing zhai 養性齋 [likely 1800s]",
+        "citations": [],
+        "footnotes": null,
+        "date": null,
+        "sortorder": 2
+      },
+      {
+        "description": "Li Zaixian 李在銛 [early 1900s]",
+        "citations": [],
+        "footnotes": null,
+        "date": null,
+        "sortorder": 3
+      },
+      {
+        "description": "Luo Zhenyu 羅振玉 [1866–1940]",
+        "citations": [],
+        "footnotes": null,
+        "date": null,
+        "sortorder": 4
+      },
+      {
+        "description": "Yamamoto Teijiro 山本悌二郞 [1870–1937], Tokyo, Japan",
+        "citations": [],
+        "footnotes": null,
+        "date": null,
+        "sortorder": 5
+      },
+      {
+        "description": "(Yamanaka and Company, New York, NY, sold to the Cleveland Museum of Art)",
+        "citations": [],
+        "footnotes": null,
+        "date": "?–1933",
+        "sortorder": 6
+      },
+      {
+        "description": "The Cleveland Museum of Art, Cleveland, OH",
+        "citations": [],
+        "footnotes": null,
+        "date": "1933–",
+        "sortorder": 7
+      }
+    ],
+    "exhibitions": {
+      "current": [
+        {
+          "id": 312517,
+          "title": "The Twentieth Anniversary Exhibition: The Official Art Exhibit of the Great Lakes Exposition",
+          "description": "<i>The Twentieth Anniversary Exhibition: The Official Art Exhibit of the Great Lakes Exposition</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (June 26-October 4, 1936).",
+          "opening_date": "1936-06-26T04:00:00"
+        },
+        {
+          "id": 312341,
+          "title": "The Silver Jubilee Exhibition",
+          "description": "<i>The Silver Jubilee Exhibition</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (June 23-September 28, 1941).",
+          "opening_date": "1941-06-23T04:00:00"
+        },
+        {
+          "id": 355653,
+          "title": "Exhibition of the Month: The Romantic Spirit",
+          "description": "<i>Exhibition of the Month: The Romantic Spirit</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (March 29-May 5, 1952).",
+          "opening_date": "1952-03-29T05:00:00"
+        },
+        {
+          "id": 300427,
+          "title": "Chinese Landscape Painting",
+          "description": "<i>Chinese Landscape Painting</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (November 5-December 26, 1954).",
+          "opening_date": "1954-11-05T04:00:00"
+        },
+        {
+          "id": 304518,
+          "title": "Chinese Paintings: Themes and Techniques",
+          "description": "<i>Chinese Paintings: Themes and Techniques</i>. The Cleveland Museum of Art, Cleveland, OH (February 7-April 5, 1981).",
+          "opening_date": "1981-02-07T05:00:00"
+        },
+        {
+          "id": 304517,
+          "title": "Eight Dynasties of Chinese Painting",
+          "description": "<i>Eight Dynasties of Chinese Painting</i>. The Nelson-Atkins Museum of Art (November 7, 1980-January 4, 1981); The Cleveland Museum of Art (February 11-March 29, 1981); Tokyo National Museum (October 4-November 17, 1982).",
+          "opening_date": "1981-02-11T05:00:00"
+        },
+        {
+          "id": 304561,
+          "title": "Visions of Landscape: East and West",
+          "description": "<i>Visions of Landscape: East and West</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (February 17-March 21, 1982).",
+          "opening_date": "1982-02-17T05:00:00"
+        },
+        {
+          "id": 311446,
+          "title": "Asian Autumn: Masterpieces from the Collection",
+          "description": "<i>Asian Autumn: Masterpieces from the Collection</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (September 17, 1991-January 5, 1992).",
+          "opening_date": "1991-09-17T04:00:00"
+        },
+        {
+          "id": 211775,
+          "title": "Highlights of Asian Paintings from The Cleveland Museum of Art",
+          "description": "<i>Highlights of Asian Paintings from The Cleveland Museum of Art</i>. Nara National Museum (organizer) (February 21-March 29, 1998); Suntory Museum of Art (April 28-June 21, 1998).",
+          "opening_date": "1998-02-21T00:00:00"
+        },
+        {
+          "id": 213950,
+          "title": "The Chinese Painter as Poet",
+          "description": "<i>The Chinese Painter as Poet</i>. China Institute in America, New York, NY (organizer) (September 14-December 17, 2000).",
+          "opening_date": "2000-09-14T00:00:00"
+        },
+        {
+          "id": 202129,
+          "title": "Admired from Afar: Masterworks of Japanese Painting from the Cleveland Museum of Art",
+          "description": "<i>Admired from Afar: Masterworks of Japanese Painting from the Cleveland Museum of Art</i>. Tokyo National Museum, Tokyo, Japan (January 15-February 23, 2014); Kyushu National Museum, Fukuoka, Japan (July 8-August 31, 2014).",
+          "opening_date": "2014-01-15T00:00:00"
+        },
+        {
+          "id": 298005,
+          "title": "Inspired by Chinese Landscape and Art – Chinese Gallery Rotation 240a, 241c",
+          "description": "<i>Inspired by Chinese Landscape and Art – Chinese Gallery Rotation 240a, 241c</i>. The Cleveland Museum of Art (organizer) (August 14, 2017-February 5, 2018).",
+          "opening_date": "2017-08-14T04:00:00"
+        },
+        {
+          "id": 395234,
+          "title": "China’s Southern Paradise: Treasures from the Lower Yangzi Delta",
+          "description": "<i>China’s Southern Paradise: Treasures from the Lower Yangzi Delta</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (September 10, 2023-January 7, 2024).",
+          "opening_date": "2023-09-10T04:00:00"
+        }
+      ],
+      "legacy": [
+        {
+          "description": "<em>To-So-Gen-Min, II</em>. Tokyo Imperial Museum, Tokyo, Japan (November 24-December 16, 1928).",
+          "opening_date": "1928-11-24T05:00:00Z"
+        },
+        {
+          "description": "<em>The International Exhibition of Chinese Art</em>. Burlington House, Royal Academy of Arts, London, England (November 28, 1935-March 7, 1936).",
+          "opening_date": "1935-11-28T05:00:00Z"
+        },
+        {
+          "description": "<em>Pacific Cultures, China</em>. Golden Gate International Exhibition, San Francisco, CA (1939).",
+          "opening_date": "1939-01-01T05:00:00Z"
+        },
+        {
+          "description": "<em>Main Asian Rotation (Gallery 120)</em>. The Cleveland Museum of Art, Cleveland, OH (March 4-July 22, 2003).",
+          "opening_date": "2003-03-04T05:00:00Z"
+        }
+      ]
+    },
+    "images": {
+      "annotation": null,
+      "web": {
+        "url": "https://openaccess-cdn.clevelandart.org/1933.220/1933.220_web.jpg",
+        "width": "1263",
+        "height": "225",
+        "filesize": "203366",
+        "filename": "1933.220_web.jpg"
+      },
+      "print": {
+        "url": "https://openaccess-cdn.clevelandart.org/1933.220/1933.220_print.jpg",
+        "width": "3400",
+        "height": "605",
+        "filesize": "1446852",
+        "filename": "1933.220_print.jpg"
+      },
+      "full": {
+        "url": "https://openaccess-cdn.clevelandart.org/1933.220/1933.220_full.tif",
+        "width": "17333",
+        "height": "3085",
+        "filesize": "160437352",
+        "filename": "1933.220_full.tif"
+      }
+    },
+    "creators": [
+      {
+        "id": 6215,
+        "description": "Mi Youren (Chinese, 1072–1151)",
+        "extent": null,
+        "qualifier": null,
+        "role": "artist",
+        "biography": null,
+        "name_in_original_language": "米友仁",
+        "birth_year": "1072",
+        "death_year": "1151",
+        "use_in_caption": true,
+        "include_extent": false,
+        "weight": 1
+      }
+    ]
+  }
+]

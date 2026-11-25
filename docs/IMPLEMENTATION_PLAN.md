@@ -55,7 +55,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
   - sau đó chạy đầy đủ `uv run python -m artrag.data.fetch_cma` → in tổng 3.964 (±, dữ liệu có thể đổi).
 - **Done khi**: chạy lại lần 2 không gọi mạng (in "cached").
 
-### [ ] T1.2 Parse bản ghi CMA (§2.3)
+### [x] T1.2 Parse bản ghi CMA (§2.3) (2026-11-25)
 - **Files**: `src/artrag/data/cma_parse.py`, `tests/fixtures/cma_sample.json` (3 bản ghi thật cắt từ raw: 1 bản đủ trường, 1 bản thiếu provenance, 1 bản tranh châu Á), `tests/test_cma_parse.py`.
 - **Nội dung**:
   - `parse_artwork(rec) -> dict` theo schema `artworks`;
