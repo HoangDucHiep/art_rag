@@ -1,0 +1,161 @@
+"""T1.3: quy tac chunking cua KB (SYSTEM_DESIGN 2.3).
+
+Moi ham o day deu thuan: khong can du lieu, model hay mang.
+
+- ``description``/``did_you_know``/``artist_bio``: tach theo cau, gop toi
+  ``sentence_max_words`` tu, overlap ``overlap_sentences`` cau.
+- ``provenance``/``exhibitions``: moi field mot chunk, cat o ``field_max_words``.
+- ``overview``: dung mot chunk cho moi tac pham.
+- Moi chunk deu bi hard-cap boi ``max_words_per_chunk`` va khong duoc rong.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from artrag.data.cma_parse import overview_text
+from artrag.utils.text import split_sentences
+
+# field nao tach theo cau (co overlap), field nao giu nguyen mot chunk
+SENTENCE_FIELDS = ("description", "did_you_know", "artist_bio")
+SINGLE_FIELDS = ("provenance", "exhibitions")
+
+CHUNK_FIELDS = ("overview",) + SENTENCE_FIELDS + SINGLE_FIELDS
+
+CHUNK_COLUMNS = [
+    "chunk_id",
+    "artwork_id",
+    "artist_id",
+    "field",
+    "text",
+    "source_url",
+    "n_words",
+]
+
+
+def count_words(text: str) -> int:
+    """So tu ( tach theo khoang trang)."""
+    if not text:
+        return 0
+    return len(text.split())
+
+
+def chunk_sentences(
+    text: str,
+    max_words: int,
+    overlap_sentences: int = 1,
+) -> list[str]:
+    """Tach van ban thanh cac chunk cau voi ghep den ``max_words`` tu.
+
+    Cac chunk lien tiep chia se ``overlap_sentences`` cau cuoi voi chunk sau.
+    Khong sinh chunk rong; cau don le qua dai bi cat cung.
+    """
+    if not text or not text.strip():
+        return []
+    sentences = split_sentences(text)
+    if not sentences:
+        return []
+
+    chunks: list[str] = []
+    current: list[str] = []
+    current_words = 0
+
+    for sentence in sentences:
+        sentence_words = count_words(sentence)
+        # cau qua dai -> cat thanh nhieu doan nho
+        if sentence_words > max_words:
+            if current:
+                chunks.append(" ".join(current))
+                current, current_words = [], 0
+            words = sentence.split()
+            for start in range(0, len(words), max_words):
+                piece = " ".join(words[start : start + max_words]).strip()
+                if piece:
+                    chunks.append(piece)
+            continue
+
+        if current_words + sentence_words > max_words and current:
+            chunks.append(" ".join(current))
+            tail = current[-overlap_sentences:] if overlap_sentences > 0 else []
+            current = list(tail)
+            current_words = sum(count_words(s) for s in current)
+
+        current.append(sentence)
+        current_words += sentence_words
+
+    if current:
+        text_chunk = " ".join(current).strip()
+        if text_chunk:
+            chunks.append(text_chunk)
+    return [c for c in chunks if c.strip()]
+
+
+def chunk_single(text: str, max_words: int) -> list[str]:
+    """Cat van ban thanh mot chunk (theo tu), dung cho provenance/exhibitions."""
+    if not text or not text.strip():
+        return []
+    words = text.split()
+    if len(words) <= max_words:
+        return [text.strip()]
+    return [" ".join(words[start : start + max_words]) for start in range(0, len(words), max_words)]
+
+
+def _field_value(row: dict[str, Any], field: str) -> str:
+    value = row.get(field)
+    if field == "provenance":
+        value = row.get("provenance_text")
+    elif field == "exhibitions":
+        value = row.get("exhibitions_text")
+    elif field == "overview":
+        return overview_text(row)
+    return str(value) if value else ""
+
+
+def make_chunk_rows(
+    row: dict[str, Any],
+    sentence_max_words: int = 180,
+    field_max_words: int = 250,
+    overlap_sentences: int = 1,
+    max_words_per_chunk: int = 250,
+) -> list[dict[str, Any]]:
+    """Sinh cac dong chunk cho mot tac pham (theo thu tu field).
+
+    ``chunk_id`` = ``{artwork_id}#{field}#{i}`` voi ``i`` bat dau tu 0.
+    """
+    artwork_id = row.get("artwork_id")
+    artist_id = row.get("artist_id")
+    source_url = row.get("source_url")
+    rows: list[dict[str, Any]] = []
+
+    for field in CHUNK_FIELDS:
+        text = _field_value(row, field)
+        if not text or not text.strip():
+            continue
+
+        if field == "overview":
+            pieces = chunk_single(text, max_words_per_chunk)
+        elif field in SENTENCE_FIELDS:
+            pieces = chunk_sentences(text, sentence_max_words, overlap_sentences)
+        else:
+            pieces = chunk_single(text, field_max_words)
+
+        for index, piece in enumerate(pieces):
+            piece = piece.strip()
+            if not piece:
+                continue
+            # hard-cap moi chunk (ke ca overview)
+            words = piece.split()
+            if len(words) > max_words_per_chunk:
+                piece = " ".join(words[:max_words_per_chunk])
+            rows.append(
+                {
+                    "chunk_id": f"{artwork_id}#{field}#{index}",
+                    "artwork_id": artwork_id,
+                    "artist_id": artist_id,
+                    "field": field,
+                    "text": piece,
+                    "source_url": source_url,
+                    "n_words": count_words(piece),
+                }
+            )
+    return rows

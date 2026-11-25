@@ -63,7 +63,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
   - `exhibitions_text`; `overview_text(row)`.
 - **Verify**: `uv run pytest tests/test_cma_parse.py -q` (Eakins: `prev_owner` chứa "Susan MacDowell Eakins"; HTML đã bị strip).
 
-### [ ] T1.3 Build KB: artworks + chunks (§2.3, §4 bước 2)
+### [x] T1.3 Build KB: artworks + chunks (§2.3, §4 bước 2) (2026-11-25)
 - **Files**: `src/artrag/data/build_kb.py`, `src/artrag/data/chunking.py`, `tests/test_chunking.py`.
 - **Nội dung**:
   - đọc raw → lọc có description → `artworks.parquet`;
