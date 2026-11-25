@@ -45,7 +45,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 
 ## M1. Dữ liệu (CPU, local, tuần 1)
 
-### [ ] T1.1 Fetch CMA (§2.1, §4 bước 1)
+### [x] T1.1 Fetch CMA (§2.1, §4 bước 1) (2026-11-25)
 - **Files**: `src/artrag/data/fetch_cma.py`.
 - **Nội dung**:
   - phân trang `limit=1000&skip=…` với `type=Painting&cc0=1&has_image=1`;

@@ -1,5 +1,6 @@
 # Dữ liệu và artefact (không commit)
-data/
+# Chỉ thư mục dữ liệu ở gốc repo; KHÔNG đụng src/artrag/data/ (code).
+/data/
 artifacts*.zip
 
 # Kết quả thí nghiệm lớn
