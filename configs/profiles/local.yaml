@@ -1,0 +1,30 @@
+# Profile local: máy cá nhân, GPU 4GB (GTX 1650).
+vram_budget_mb: 3600
+
+llm:
+  backend: hf_local
+  model: qwen3b
+
+context:
+  max_tokens: 1500
+
+query:
+  translator: vinai
+
+# Ghi đè devices/dtype/pinned của từng model (§6.2).
+models:
+  clip:
+    pinned: true
+    devices: [cuda, cpu]
+  text_embed:
+    devices: [cpu]
+  vi2en:
+    devices: [cpu]
+  en2vi:
+    devices: [cpu]
+  blip_itm:
+    devices: [cuda, cpu]
+  blip_vqa:
+    devices: [cuda, cpu]
+  qwen3b:
+    devices: [cuda, cpu]

@@ -1,0 +1,24 @@
+# Profile api: model thị giác chạy local, LLM gọi qua API (Groq/NIM).
+vram_budget_mb: 3600
+
+llm:
+  backend: groq
+  model: llama-3.3-70b-versatile
+  fallback: nim
+
+context:
+  max_tokens: 1500
+
+query:
+  translator: llm
+
+models:
+  clip:
+    pinned: true
+    devices: [cuda, cpu]
+  text_embed:
+    devices: [cpu]
+  vi2en:
+    devices: [cpu]
+  en2vi:
+    devices: [cpu]

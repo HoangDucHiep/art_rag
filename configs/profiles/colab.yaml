@@ -1,0 +1,28 @@
+# Profile colab: GPU T4 16GB, nạp tất cả model lên GPU.
+vram_budget_mb: 14000
+
+llm:
+  backend: hf_local
+  model: qwen3b
+
+context:
+  max_tokens: 1500
+
+query:
+  translator: vinai
+
+models:
+  clip:
+    devices: [cuda]
+  text_embed:
+    devices: [cuda]
+  vi2en:
+    devices: [cuda]
+  en2vi:
+    devices: [cuda]
+  blip_itm:
+    devices: [cuda]
+  blip_vqa:
+    devices: [cuda]
+  qwen3b:
+    devices: [cuda]

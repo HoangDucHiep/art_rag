@@ -1,0 +1,80 @@
+profile: local
+
+paths:
+  data_dir: "${env:ARTRAG_DATA_DIR,./data}"
+  results_dir: ./results
+
+data:
+  cma_type: Painting
+  min_description_chars: 50
+  image_max_side: 512
+
+index:
+  clip_model: clip
+  text_model: text_embed
+  batch_size: 64
+
+query:
+  translator: vinai
+  clip_template: T1
+  title_boost: 0.15
+
+retrieval:
+  n_clip: 50
+  n_text: 100
+  top_n: 20
+  fuse: minmax
+  bio_propagation: 0.8
+  branch_weights:
+    VISUAL: [0.6, 0.4]
+    CONTENT: [0.6, 0.4]
+    IDENTIFY: [0.8, 0.2]
+    GENERAL: [0.5, 0.5]
+    default_meta: [0.2, 0.8]
+
+rerank:
+  mode: visual_only
+  w_clip: 0.5
+  w_blip: 0.5
+  batch_size: 8
+
+evidence:
+  top_k: 3
+  max_snippets: 2
+  vqa: true
+  vqa_low_conf: 0.3
+
+abstain:
+  enabled: true
+  tau_text: 0.45
+  tau_clip: 0.24
+  tau_img: 0.85
+  delta: 0.05
+  force_on_no_citation: true
+
+context:
+  max_tokens: 1500
+  max_snippet_words: 120
+
+llm:
+  backend: hf_local
+  model: qwen3b
+  prompt: grounded_vi_v1
+  gen:
+    max_new_tokens: 256
+    temperature: 0.0
+  fallback: null
+
+backends:
+  groq:
+    type: openai_compat
+    base_url: https://api.groq.com/openai/v1
+    model: llama-3.3-70b-versatile
+    api_key_env: GROQ_API_KEY
+    rpm_limit: 30
+  nim:
+    type: openai_compat
+    base_url: https://integrate.api.nvidia.com/v1
+    model: meta/llama-3.3-70b-instruct
+    api_key_env: NVIDIA_API_KEY
+    rpm_limit: 40
