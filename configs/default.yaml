@@ -20,6 +20,18 @@ data:
     overlap_sentences: 1
     max_words_per_chunk: 250
     max_exhibitions: 10
+  wiki_search_limit: 10
+  wiki_label_threshold: 88
+  wiki_birth_tolerance: 3
+  wiki_min_interval_s: 0.35
+  wiki_timeout_s: 30
+  wiki_max_retries: 4
+  wiki_backoff_s: 3.0
+  wiki_user_agent: "artrag/0.1 (educational RAG project; contact: local)"
+  wiki_progress_every: 25
+  wiki_mode: batch
+  wiki_batch_size: 25
+  wiki_extract_batch_size: 20
 
 index:
   clip_model: clip

@@ -73,7 +73,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
   - `uv run pytest tests/test_chunking.py -q`;
   - `uv run python -m artrag.data.build_kb --check` → ≥2.000 tác phẩm, ≥10 department, không có chunk rỗng hoặc vượt 250 từ.
 
-### [ ] T1.4 Enrich Wikipedia (§2.1, §4 bước 3)
+### [x] T1.4 Enrich Wikipedia (§2.1, §4 bước 3)
 - **Files**: `src/artrag/data/enrich_wiki.py`.
 - **Nội dung**:
   - với mỗi artist duy nhất: Wikidata `wbsearchentities` (tên + năm sinh để chọn đúng: kiểm tra `P31=Q5` và `P569` nếu có) → enwiki title → REST summary;

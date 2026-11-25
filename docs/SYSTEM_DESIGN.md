@@ -108,6 +108,28 @@ Quy tắc chunking:
 
 **`captions.parquet`** (trong `data/cache/`): artwork_id, model, params_hash, caption, ms.
 
+**Quy tac match artist <-> Wikidata** (bổ sung 2026-11-25, T1.4):
+- Dedup theo `artist_id` (KHONG theo ten): 762 `artist_id` duy nhat cho 762 nguoi, co 3 ten trung (`Sesson Shūkei` la 2 nguoi; `Kaihō Yūshō`, `Nagasawa Rosetsu` co 2 `creator_id` khac nhau). Ten chi de tra cua.
+- Chuoi truy xuat (da doi sang **batch**, xem cac bullet phia duoi): SPARQL `query.wikidata.org` giai ten -> MediaWiki `api.php` lay `extract` + `wikibase_item`. KHONG dung `wbsearchentities` theo tung artist (bi 429).
+- **Diem so sanh phai cham moi bien the ten**, khong chi `labels.en`: candidate co `label` (canonical `rdfs:label` @en), `match.text` va `aliases`. Wikidata luu nhieu hoa si voi nhan canonical rut gon (vi du `J. M. W. Turner`) trong khi CMA goi ten day du (`Joseph Mallord William Turner`); chi so sanh `label` se bo sot cac artist nhu vay.
+- **Dieu kien chap nhan**: entity phai co `P31` chua `Q5` **VA** co `P31` la nghe nghe thuat (trong `ARTIST_OCCUPATIONS`: painter, artist, sculptor, printmaker, engraver, illustrator, photographer, calligrapher, ...) **VA** co sitelink `enwiki`. Neu KB co `artist_birth`, khop nam sinh trong +-3 nam la *uu tien* nhung khong bat buoc (82/762 artist khong co nam sinh); khop ten >= `wiki_label_threshold` (mac dinh 88) la du, hoac khop nam sinh **va** khop ten >= 70 (nganh duyet cho nhan rut gon).
+- **Phai so sanh voi nhan canonical, khong phai echo cua truy van**: `resolve_names_batch` giu `label` = ten da hoi (echo) nen moi candidate deu doi 100.0. Phai lay `?canon` (`rdfs:label` @en) tu SPARQL va cham diem vao `canonical_label`; neu khong co canonical English thi moi dung alias. Day la ly do `Zhou Chen` (Q3575430) khong con bi match nham `Shen Zhou` (Q558863) (alias `Zhou Chen`).
+- **`label_score` phai loai tien to va token khong chua nhau**: `token_set_ratio` cho 88.9 diem cho `Zhou Chen` vs `Shen Zhou` (chung token `zhou`) va `fuzz.ratio` cho 90.0 cho `Wang Yuan` vs `Wang Yuanqi`. Da them `_has_prefix_conflict` (token la goi cua token khac -> 0.0), `_merge_initials` (`J. M. W. Turner` -> `Joseph Mallord William Turner`) va `normalize_name` bo dau ngoac don (`’` -> `'`).
+- **Pha `wdt:P569` chi tra nam sinh rank `preferred`**: vd `Tsukioka Settei` tra 1726 trong khi rank `normal` la 1710 (ghi chu trong KB). Dung `p:P569/ps:P569` de lay **tat ca** rank truoc khi quyet dinh mismatch.
+- **Nhan Wikidata co the khong co tag `@en`**: hoa si Chuyen A co nhan `mul`/`ja`/`zh`. SPARQL doi lang-tagging literal (`@en`, `@mul`, `@zh`, `@ja`) voi `rdfs:label`/`skos:altLabel`.
+- **Trang Wikipedia co the la trang giai nghia**: dung `pageprops.disambiguation` (MediaWiki) thay vi heuristic tren text; heuristic chi kiem tra **cau dau tien** de tranh false positive (vi du `Agnolo Bronzino` co cau "... may refer to his relatively dark skin").
+- **Phai loai false positive do trung ten**: cau SPARQL ghep `wdt:P106` (nghe) nen `Wang Yuan` -> `Wang Yuan (painter)` (Q2889034) chu khong phai `Wang Yuan (mathematician)` (Q2601552). Ngoai ra mo ta Wikidata (`schema:description`) cung duoc kiem tra.
+- **Phai giai ma ten bai**: URL wikipedia percent-encode (vd `Ogata K%C5%8Drin`); phai `unquote` truoc khi so sanh, neu khong se khong tim duoc `wiki_summary` cho 239/762 record.
+- **Duong dan du phong theo ten bai**: nhieu hoa si Trung Quoc co nhan Wikidata o chu Han (`趙孟頫`) nhung bai enwiki la tieng Anh (`Zhao Mengfu`). Khi SPARQL theo nhan khong ra ket qua, tra cuu `en.wikipedia.org/w/api.php?action=query&prop=pageprops` theo **ten bai** de lay `wikibase_item` (QID) + `extract`. Tang ty le tim thay tu 74,9% len 80,6%.
+- File cache `raw/wiki/{artist_id}.json` gom: `artist_id`, `name`, `birth_year`, `status` (`found` | `not_found` | `error`), `wikidata_qid`, `wiki_title`, `wiki_url`, `wiki_summary`, `matched_label`, `match_score`, `birth_matched`, `cma_bio`, `fetched_at`. **Ca `not_found` va `error` deu duoc cache** nen chay lai khong goi lai mang.
+- `cma_bio` lay san tu `creators[].biography` cua ban ghi CMA (403 creator, trong do 296 la `role=="artist"`), luu cung file cache de T1.5 khong phai doc lai raw.
+- Wikidata **rat de tra HTTP 429** ( gioi han anonymous API theo IP: ~10 request moi "burst", sau do 429 30-50 giay). Do do **khong duoc** goi API tung artist (2-3 request/artist x 762 artist = ~2.300 request => hàng gio). Phai dung **che do batch**:
+  - **Giai ten (Wikidata)**: SPARQL endpoint `query.wikidata.org` voi `VALUES ?name { ... }` (nhom ~25 ten/request), join `rdfs:label|skos:altLabel` + `wdt:P31 wd:Q5` + `OPTIONAL { wdt:P569 }` + `OPTIONAL { schema:isPartOf enwiki }`. Ket qua: QID, nam sinh, URL bai enwiki. 25 ten ~5 giay.
+  - **Tom tat (Wikipedia)**: `en.wikipedia.org/w/api.php?action=query&prop=extracts|info&exintro=1&explaintext=1&redirects=1&inprop=url&titles=A|B|C` (nhom ~30 title/request). 30 title ~5 giay.
+  - Toan bo 762 artist: ~31 request SPARQL + ~26 request Wikipedia = **~57 request** thay vi ~2.300.
+- Cache `raw/wiki/{artist_id}.json` van giu nguyen: moi artist 1 file, dung de T1.5 doc nhanh.
+- `enrich_artist` **khong bao gio nem loi**: loi mang -> `status="error"` va duoc cache, de chay full khong bi dung giua chung.
+
 ### 2.4 Bố cục artefact trên đĩa
 ```
 data/                         # gitignore; gốc lấy từ ARTRAG_DATA_DIR (mặc định ./data)
