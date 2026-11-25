@@ -92,6 +92,20 @@ Quy tắc chunking:
 - `provenance`, `exhibitions`: mỗi trường một chunk, cắt ở khoảng 250 từ.
 - Ước tính khoảng 2.210 × 3,5 + khoảng 900 bio, tức khoảng 9.000 chunk.
 
+**Quy tắc parse cụ thể** (bổ sung 2026-11-25 sau khi kiểm tra dữ liệu thật từ CMA API):
+1. **`prev_owner`**: `provenance` là list entry `{date, description, citations, footnotes}`. Tìm **entry cuối cùng** có `description` chứa "Cleveland Museum of Art" (không phân biệt hoa thường). `prev_owner` = entry **ngay trước** đó; lấy phần tên trước dấu `[` (dấu ngoặc vuông chứa năm) hoặc trước dấu `,` đầu tiên, bỏ ngoặc dẫn đầu. Nếu entry của CMA là entry đầu tiên thì `prev_owner = null`.
+   - Ví dụ Eakins `cma-151904`: entries `("1916-1927", "Susan MacDowell Eakins [1851-1938], Philadelphia, sold to the Cleveland Museum of Art")` rồi `("1927-", "The Cleveland Museum of Art, Cleveland, OH")` → entry CMA là index 1 → entry trước là index 0 → `prev_owner = "Susan MacDowell Eakins"`.
+2. **`provenance_text`**: mỗi entry thành `"<date>: <description>"` (giữ nguyên, không strip mạnh), nối các entry bằng `"; "`.
+3. **`exhibitions_text`**: lấy `exhibitions.current`, sắp xếp theo `opening_date` **giảm dần**, giữ tối đa 10 mục, mỗi mục `"<title> (<description đã strip HTML>)"`, nối bằng `"; "`.
+4. **`overview_text`**: template cố định `Title: … | Artist: … | Date: … | Medium: … | Culture: … | Department: … | Location: … | Credit line: …`; bỏ mọi mục có giá trị rỗng; `Location` ghi kèm `(on view)` khi `current_location` khác null, và bị bỏ hẳn khi null.
+5. **Tên họa sĩ**: `creators[i].description` có dạng `"<Tên> (<Quốc tịch>, <năm sinh>–<năm tử>)"`. Tách tên = phần trước dấu `(`; phần trong ngoặc tách theo dấu `,` → quốc tịch và khoảng năm. Quốc tịch chỉ lấy **phần đầu** trước chữ "born"/"b." (ví dụ `"American, born England,1801–1848"` → quốc tịch `"American"`, năm sinh 1801). Năm có tiền tố `c.` thì `birth = null` nhưng vẫn giữ nguyên nhãn trong `overview_text`. `birth_year`/`death_year` từ field số của API được ưu tiên khi có.
+6. **Trường HTML**: `description`, `did_you_know`, `creators[].biography`, `exhibitions[].description` chứa HTML → luôn `strip_html` trước khi lưu.
+7. **Null-safety**: khoảng 24% bản ghi **không** có creator với `role == "artist"` (phần lớn là tranh Ấn Độ/Trung Quốc không gán họa sĩ) → `artist_id`, `artist_name`, `artist_role` đều null; không được ném lỗi.
+
+**Định dạng file raw** (bổ sung 2026-11-25): `raw/cma/page_{skip:05d}.json` lưu **nguyên body API** (`{"info": …, "data": […]}`) cộng thêm khóa `"_meta"` = `{skip, limit, total, fetched_at}`. Một trang được coi là cache hợp lệ khi `_meta.skip == skip` **và** `_meta.limit >= limit` yêu cầu; nếu không thì phải tải lại. Hệ quả: chạy `--limit 50` rồi chạy full sẽ tải lại trang 0 (trang đó chỉ chứa 50 bản ghi).
+
+**Ngưỡng chunking nằm trong config** (`configs/default.yaml`, khoá `data.chunking.*`): `sentence_max_words` (180) cho `description`/`did_you_know`/`artist_bio`, `field_max_words` (250) cho `provenance`/`exhibitions`, `overlap_sentences` (1), và **hard-cap 250 từ cho mọi chunk** kể cả `overview` (chunk không được rỗng).
+
 **`captions.parquet`** (trong `data/cache/`): artwork_id, model, params_hash, caption, ms.
 
 ### 2.4 Bố cục artefact trên đĩa
@@ -514,7 +528,17 @@ Mọi ngưỡng (τ, δ) và lựa chọn prompt/trọng số chỉ được ch�
 ```yaml
 profile: local
 paths: {data_dir: ${env:ARTRAG_DATA_DIR,./data}, results_dir: ./results}
-data: {cma_type: Painting, min_description_chars: 50, image_max_side: 512}
+data:
+  cma_type: Painting
+  min_description_chars: 50
+  image_max_side: 512
+  cma_api_base: "https://openaccess-api.clevelandart.org/api/artworks/"
+  cma_page_size: 1000
+  cma_timeout_s: 60
+  cma_max_retries: 3
+  cma_backoff_s: 2.0
+  cma_user_agent: "artrag/0.1 (educational RAG project; contact: local)"
+  chunking: {sentence_max_words: 180, field_max_words: 250, overlap_sentences: 1}
 index: {clip_model: clip, text_model: text_embed, batch_size: 64}
 query: {translator: vinai, clip_template: T1, title_boost: 0.15}
 retrieval:

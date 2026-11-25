@@ -8,6 +8,18 @@ data:
   cma_type: Painting
   min_description_chars: 50
   image_max_side: 512
+  cma_api_base: "https://openaccess-api.clevelandart.org/api/artworks/"
+  cma_page_size: 1000
+  cma_timeout_s: 60
+  cma_max_retries: 3
+  cma_backoff_s: 2.0
+  cma_user_agent: "artrag/0.1 (educational RAG project; contact: local)"
+  chunking:
+    sentence_max_words: 180
+    field_max_words: 250
+    overlap_sentences: 1
+    max_words_per_chunk: 250
+    max_exhibitions: 10
 
 index:
   clip_model: clip
