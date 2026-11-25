@@ -8,13 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tài liệu nguồn (đọc khi cần, không đọc toàn bộ mỗi lần)
 - [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md): thiết kế chi tiết; schema dữ liệu §2.3, pipeline online §5, registry/cache/trace §6, đánh giá §8.
 - [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md): danh sách task T0.1…T9.x, mỗi task có Files, lệnh Verify, "Done khi" và trạng thái checkbox.
+- [docs/HANDOFF.md](docs/HANDOFF.md): trạng thái hiện tại của repo (viết lại mỗi session, không commit). Đọc đầu phiên để nắm bối cảnh; cập nhật lại khi kết thúc session.
 
 ## Cách làm việc (bắt buộc)
 - Làm **từng task một** theo IMPLEMENTATION_PLAN. Chỉ đọc § thiết kế được dẫn và các file liệt kê trong task. Không quét lại toàn repo.
 - Mỗi task kết thúc bằng việc chạy lệnh Verify của task đó, tick checkbox, rồi commit `T<id>: …`.
+- **Verify phải do subagent độc lập thực hiện**, không do main agent tự verify (bảo đảm công bằng, khách quan).
 - Thiết kế cần đổi thì sửa SYSTEM_DESIGN.md trước (ghi ngắn lý do), sau đó mới code.
 - Lệnh gọi mạng hoặc model thật khi verify luôn dùng `--limit` nhỏ.
 - Notebook (`notebooks/`) chỉ là wrapper mỏng gọi `python -m artrag.…`; không viết logic trong notebook. Notebook nộp bài `final_end_to_end.ipynb` chỉ làm ở bước cuối (T8.5).
+- **`docs/HANDOFF.md` viết lại (overwrite) ở đầu mỗi session**, không append nối. File phải tự chứa đủ để người đọc mới hiểu trạng thái hiện tại (repo, commit, dữ liệu, API, bài toan đã giải, lưu ý, task kế tiếp) mà không cần đọc session cũ. Lịch sử nằm trong `git log`.
 
 ## Lệnh
 - Môi trường: `uv sync` (Python 3.11; Python 3.15 của hệ thống không dùng).
