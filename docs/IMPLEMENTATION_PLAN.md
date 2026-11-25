@@ -17,7 +17,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 
 ## M0. Khung dự án (tuần 1)
 
-### [ ] T0.1 Khởi tạo repo
+### [x] T0.1 Khởi tạo repo (2026-11-25)
 - **Files**: `pyproject.toml`, `.gitignore`, `.env.example`, `src/artrag/__init__.py`, `tests/test_smoke.py`, `README.md` (khung).
 - **Nội dung**:
   - `git init`; `uv init --package --python 3.11`;
@@ -26,7 +26,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Verify**: `uv run pytest -q` → 1 passed; `uv run python -c "import artrag; print(artrag.__version__)"`.
 - **Done khi**: hai lệnh trên chạy được, commit đầu tiên.
 
-### [ ] T0.2 Config loader (§6.1, §9.1)
+### [x] T0.2 Config loader (§6.1, §9.1) (2026-11-25)
 - **Files**: `src/artrag/config.py`, `configs/default.yaml`, `configs/profiles/{local,colab,kaggle,api}.yaml`, `tests/test_config.py`.
 - **Nội dung**:
   - `load_config(profile=None, experiment=None, overrides=list[str]) -> Config` (dict truy cập kiểu thuộc tính, hoặc pydantic);
@@ -34,7 +34,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
   - `config_hash()`; `paths()` trả về các thư mục con của data.
 - **Verify**: `uv run pytest tests/test_config.py -q` (merge, override, env, hash ổn định).
 
-### [ ] T0.3 Trace + errors + utils (§6.5, §6.6)
+### [x] T0.3 Trace + errors + utils (§6.5, §6.6) (2026-11-25)
 - **Files**: `src/artrag/trace.py`, `errors.py`, `utils/{io.py,text.py,hashing.py}`, `tests/test_trace.py`.
 - **Nội dung**:
   - `Trace.step(name, required)` là context manager: đo thời gian, bắt lỗi (step tùy chọn → `degraded`, step bắt buộc → ném lại); `to_dict()`;
