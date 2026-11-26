@@ -19,8 +19,18 @@ from typing import Any
 import pandas as pd
 
 from artrag.config import Config, load_config, paths
+from artrag.data.artists import (
+    ARTIST_COLUMNS,
+    BIO_SOURCE_CMA,
+    BIO_SOURCE_NONE,
+    BIO_SOURCE_WIKIPEDIA,
+    build_artist_rows,
+    chunk_rows_for_artists,
+    load_wiki_records,
+)
 from artrag.data.chunking import CHUNK_COLUMNS, make_chunk_rows
 from artrag.data.cma_parse import ARTWORK_COLUMNS, parse_artwork
+from artrag.data.enrich_wiki import load_cma_bios
 
 DEFAULT_MIN_DESCRIPTION_CHARS = 50
 
@@ -102,6 +112,57 @@ def make_chunk_rows_for_all(
     return chunks
 
 
+def source_url_by_artist(rows: list[dict[str, Any]]) -> dict[str, str]:
+    """URL của tác phẩm CMA đầu tiên của mỗi họa sĩ (nguồn cho bio CMA)."""
+    urls: dict[str, str] = {}
+    for row in rows:
+        artist_id = row.get("artist_id")
+        source_url = row.get("source_url")
+        if not artist_id or not source_url:
+            continue
+        if artist_id not in urls:
+            urls[artist_id] = str(source_url)
+    return urls
+
+
+def build_artists(
+    rows: list[dict[str, Any]],
+    raw_dir: str | Path,
+    prefer_cma: bool = True,
+    min_bio_chars: int = 40,
+) -> list[dict[str, Any]]:
+    """Dựng dòng ``artists.parquet`` từ KB + cache wiki + tiểu sử CMA."""
+    wiki_records = load_wiki_records(raw_dir)
+    cma_bios = load_cma_bios(raw_dir)
+    return build_artist_rows(
+        rows,
+        wiki_records=wiki_records,
+        cma_bios=cma_bios,
+        prefer_cma=prefer_cma,
+        min_chars=min_bio_chars,
+    )
+
+
+def print_artist_stats(artist_rows: list[dict[str, Any]]) -> None:
+    """In số họa sĩ và số bio theo từng nguồn (``cma``/``wikipedia``/``none``)."""
+    total = len(artist_rows)
+    print(f"\n-- artist ({total}) --")
+    if not total:
+        return
+    by_source = {BIO_SOURCE_CMA: 0, BIO_SOURCE_WIKIPEDIA: 0, BIO_SOURCE_NONE: 0}
+    for row in artist_rows:
+        source = row.get("bio_source")
+        if source in by_source:
+            by_source[source] += 1
+        else:
+            by_source[BIO_SOURCE_NONE] += 1
+    for source in (BIO_SOURCE_CMA, BIO_SOURCE_WIKIPEDIA, BIO_SOURCE_NONE):
+        count = by_source[source]
+        print(f"{source:>16}: {count:>5} / {total} ({count / total:.1%})")
+    with_bio = by_source[BIO_SOURCE_CMA] + by_source[BIO_SOURCE_WIKIPEDIA]
+    print(f"{'có bio':>16}: {with_bio:>5} / {total} ({with_bio / total:.1%})")
+
+
 def write_parquet(rows: list[dict[str, Any]], columns: list[str], path: Path) -> Path:
     """Ghi parquet với đúng thứ tự cột (cột thiếu -> null)."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -167,6 +228,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="chỉ xử lý N tác phẩm đầu (dùng để thử nhanh)",
     )
+    parser.add_argument(
+        "--with-bio",
+        action="store_true",
+        help="dựng thêm artists.parquet và nối chunk artist_bio vào chunks.parquet",
+    )
     parser.add_argument("--profile", default=None, help="profile config (mặc định: local)")
     parser.add_argument(
         "--set",
@@ -198,13 +264,37 @@ def main(argv: list[str] | None = None) -> int:
     max_words_per_chunk = int(chunking.get("max_words_per_chunk", 250))
     chunks = make_chunk_rows_for_all(rows, cfg)
 
+    artist_rows: list[dict[str, Any]] = []
+    if args.with_bio:
+        prefer_cma = bool(_cfg_get(cfg, "bio_prefer_cma", True))
+        min_bio_chars = int(_cfg_get(cfg, "bio_min_chars", 40))
+        artist_rows = build_artists(
+            rows,
+            p.raw,
+            prefer_cma=prefer_cma,
+            min_bio_chars=min_bio_chars,
+        )
+        bio_chunks = chunk_rows_for_artists(
+            artist_rows,
+            source_url_by_artist=source_url_by_artist(rows),
+            sentence_max_words=int(chunking.get("sentence_max_words", 180)),
+            overlap_sentences=int(chunking.get("overlap_sentences", 1)),
+            max_words_per_chunk=max_words_per_chunk,
+        )
+        chunks = chunks + bio_chunks
+
     if not args.check:
         write_parquet(rows, ARTWORK_COLUMNS, p.kb / "artworks.parquet")
         write_parquet(chunks, CHUNK_COLUMNS, p.kb / "chunks.parquet")
         print(f"Đã ghi {p.kb / 'artworks.parquet'}")
         print(f"Đã ghi {p.kb / 'chunks.parquet'}")
+        if args.with_bio:
+            write_parquet(artist_rows, ARTIST_COLUMNS, p.kb / "artists.parquet")
+            print(f"Đã ghi {p.kb / 'artists.parquet'}")
 
     print_stats(rows, chunks, max_words_per_chunk)
+    if args.with_bio:
+        print_artist_stats(artist_rows)
     return 0
 
 

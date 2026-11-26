@@ -73,7 +73,14 @@ Tác phẩm không thuộc kho CMA (hệ thống phải từ chối), định gi
 | credit_line | str | |
 | source_url, image_url, image_path | str | image_path tương đối với `data/` |
 
-**`artists.parquet`**: artist_id, name, birth, death, nationality, cma_bio, wikidata_qid, wiki_title, wiki_url, wiki_summary, bio_source (`cma|wikipedia|none`).
+**`artists.parquet`**: artist_id, name, birth, death, nationality, cma_bio, wikidata_qid, wiki_title, wiki_url, wiki_summary, **bio**, **bio_source** (`cma|wikipedia|none`).
+
+**Quy tắc chọn tiểu sử họa sĩ** (bổ sung 2026-11-26, T1.5):
+- Mỗi họa sĩ xuất hiện trong KB (dedup theo `artist_id`) = 1 dòng. **KHÔNG** dedup theo tên.
+- Nội dung tiểu sử dùng để chunk nằm ở cột `bio`; nguồn được ghi ở `bio_source`.
+- **Thứ tự ưu tiên**: `cma_bio` (tiểu sử do chính bảo tàng viết, `creators[].biography`) → `wiki_summary` (tóm tắt Wikipedia) → không có (`none`). Cột `bio_source` cho biết nguồn thực tế đã dùng.
+- Bio ngắn hơn `data.bio_min_chars` (mặc định 40 ký tự) bị coi là không có và chuyển sang nguồn kế tiếp. Tham số `data.bio_prefer_cma` (mặc định `true`) cho phép đảo thứ tự ưu tiên.
+- Cột `cma_bio` và `wiki_summary` vẫn được giữ nguyên trong `artists.parquet` (kể cả khi không được dùng làm `bio`) để đối chiếu, không gộp làm một.
 
 **`chunks.parquet`**, đơn vị truy xuất văn bản:
 | cột | ghi chú |
@@ -90,6 +97,7 @@ Quy tắc chunking:
 - `overview`: văn bản sinh theo template từ metadata, một chunk cho mỗi tác phẩm. Ví dụ: `Title: … | Artist: Thomas Eakins (American, 1844–1916) | Date: 1873 | Medium: oil on canvas | Culture: … | Department: … | Location: Gallery 207 American Realism (on view) | Credit line: …`. Chunk này giúp các câu hỏi metadata truy xuất tốt và luôn được đưa vào context của evidence.
 - `description`, `did_you_know`, `artist_bio`: tách theo câu, gộp đến tối đa khoảng 180 từ, overlap 1 câu.
 - `provenance`, `exhibitions`: mỗi trường một chunk, cắt ở khoảng 250 từ.
+- Chunk `artist_bio` được **nối vào cùng bảng `chunks.parquet`** (không tách bảng riêng): `chunk_id = {artist_id}#artist_bio#{i}`, `artwork_id` = null, `artist_id` bắt buộc, `source_url` = URL bài Wikipedia nếu nguồn là Wikipedia, ngược lại là URL tác phẩm CMA đầu tiên của họa sĩ đó.
 - Ước tính khoảng 2.210 × 3,5 + khoảng 900 bio, tức khoảng 9.000 chunk.
 
 **Quy tắc parse cụ thể** (bổ sung 2026-11-25 sau khi kiểm tra dữ liệu thật từ CMA API):
@@ -105,6 +113,26 @@ Quy tắc chunking:
 **Định dạng file raw** (bổ sung 2026-11-25): `raw/cma/page_{skip:05d}.json` lưu **nguyên body API** (`{"info": …, "data": […]}`) cộng thêm khóa `"_meta"` = `{skip, limit, total, fetched_at}`. Một trang được coi là cache hợp lệ khi `_meta.skip == skip` **và** `_meta.limit >= limit` yêu cầu; nếu không thì phải tải lại. Hệ quả: chạy `--limit 50` rồi chạy full sẽ tải lại trang 0 (trang đó chỉ chứa 50 bản ghi).
 
 **Ngưỡng chunking nằm trong config** (`configs/default.yaml`, khoá `data.chunking.*`): `sentence_max_words` (180) cho `description`/`did_you_know`/`artist_bio`, `field_max_words` (250) cho `provenance`/`exhibitions`, `overlap_sentences` (1), và **hard-cap 250 từ cho mọi chunk** kể cả `overview` (chunk không được rỗng).
+
+**Quy tắc tách câu (`split_sentences`)** — bổ sung 2026-11-26 sau khi phát hiện 124 chunk tiểu sử bị cắt vỡ:
+- Hàm tách câu phải **bảo toàn nguyên văn**: `" ".join(split_sentences(text)) == text` (sau khi chuẩn hóa khoảng trắng). Đây là bất biến bắt buộc, có test riêng trong `tests/test_trace.py` và được kiểm tra lại bởi `scripts/audit_t15.py`.
+- Dấu chấm sau **chữ viết tắt** KHÔNG phải hết câu:
+  - chữ viết tắt rút gọn không khoảng trắng: `q.v.`, `i.e.`, `e.g.` (token có từ 2 dấu chấm, mỗi dấu giữa là 1 chữ cái) → chỉ dấu chấm CUỐI mới có thể kết thúc câu, và còn phải kiểm tra phía sau;
+  - chữ viết tắt nhiều chữ cái: `Dr.`, `St.`, `Prof.`, `cat.`, `Ibid.` (danh sách `ABBR`);
+  - chữ cái đơn thường: `q.`, `v.` → luôn không phải hết câu;
+  - chữ cái đơn HOA: `J. M. W.` → không hết câu nếu token trước/sau cũng là chữ cái hoa đơn gạch chấm, hoặc token sau là từ viết hoa nhiều chữ (`J. Paul Getty`, `A. Turner`) hoặc từ VIẾT HOA (`Jansz. II`);
+  - số phiên bản / số hiệu: `v.15.1`, `no.12` → không hết câu (mọi thành phần phải là chữ số hoặc từ viết tắt ≤ 2 chữ cái, để `few.2` vẫn là hết câu).
+- **Hấp thụ dấu đóng ngoặc / dấu trích dán** ngay sau dấu kết thúc vào câu hiện tại (`)."`, `."`).
+- **Số đánh dấu trích dẫn chân bài** đứng sát sau dấu kết thúc (`."1`) thuộc về câu TRƯỚC, không phải bắt đầu câu mới.
+- **Dấu kết thúc nằm trong ngoặc** (`(1798-?)`, `[klod lɔ.ʁɛ̃]`) không phải hết câu → cần theo dõi độ sâu ngoặc.
+- Dấu chấm bám sát dấu phẩy/chấm phẩy (`Jansz.,`, `etc.,`) thuộc về từ, không phải hết câu.
+- Dấu chấm lửng rời nhau (`. . .`) được gộp vào câu, không tạo ranh giới câu.
+- Số thứ tự mục chú thích (`1.`, `2.` theo sau khoảng trắng và từ viết hoa) là ranh giới câu.
+
+**Ghi chú dữ liệu nguồn** (bổ sung 2026-11-26):
+- `exhibitions_text` có **space-before-punctuation** ở 1697/1697 bản ghi (vd `Capri Lace Maker .`) — đây là **nguồn** từ CMA, KHÔNG phải lỗi chunking; không được tự động sửa trong bước build (sẽ làm lệch nguyên văn so với nguồn).
+- Một số `description` của CMA cũng thiếu khoảng trắng sau dấu chấm (vd `northern Italy.The son`) — cùng tính chất, giữ nguyên.
+- Vài `bio` của CMA vốn đã **lệch ngoặc** (vd `cma-artist-2715`: 4 ngoặc mở, 5 ngoặc đóng) — không phải lỗi tách câu.
 
 **`captions.parquet`** (trong `data/cache/`): artwork_id, model, params_hash, caption, ms.
 
@@ -521,6 +549,7 @@ Mỗi item có dạng: `{qid, split, category, subtype, question_vi, gold_artwor
 | Bảng | So sánh |
 |---|---|
 | T1 Retrieval | CLIP-only × 3 template (T0/T1/T2) × {query VI đã dịch, query EN gốc}; CLIP + BLIP-ITM với (0.7/0.3), (0.5/0.5), (0.3/0.7); BGE-M3 text-only; Hybrid (minmax vs RRF); Hybrid + BLIP |
+| **T1b Chunking** (bổ sung 2026-11-26) | `sentence` (C1, baseline) vs `item` (C2) vs `semantic` (C3); áp riêng cho `provenance`, `exhibitions` (C2) và `artist_bio`, `description` (C3). Tầng 1 (proxy, không cần model): số chunk, độ dài TB, % cắt giữa mục, % cắt giữa câu, redundancy, coverage — đo bằng `uv run python -m artrag.eval.chunk_eval`. Tầng 2 (Recall@K / MRR của nhánh BGE-M3) **deferred** tới T6/T8 vì cần text index (T3.2) và bộ câu hỏi (T6.1); báo cáo ảnh so sánh top-5 chunk cho 3 câu hỏi mẫu. |
 | T2 End-to-end (bắt buộc) | **no-RAG** (Qwen, prompt `no_rag_vi`), **retrieval-only** (trả về câu tóm tắt overview của top-1 kèm [IMG-01], không có LLM), **full grounded RAG** (Qwen local), full RAG (Groq/NIM), full RAG (FLAN-T5 + dịch) |
 | T3 Ablation | bỏ VQA; bỏ rerank / rerank `always`; bỏ gate abstention; context 800/1.500/3.000; prompt v1/v2/v3; K = 1/3/5 |
 | T4 Abstention | quét τ_text và τ_clip trên dev, vẽ đường cong (abstention F1, answer coverage); chọn điểm vận hành và báo cáo trên test |

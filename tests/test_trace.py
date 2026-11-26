@@ -83,9 +83,125 @@ def test_normalize_text():
 
 
 def test_split_sentences():
-    assert split_sentences("A. B! C?") == ["A.", "B!", "C?"]
+    assert split_sentences("A dog barks. B! C?") == ["A dog barks.", "B!", "C?"]
     assert split_sentences("") == []
     assert len(split_sentences("Mot. Hai! Ba?")) == 3
+
+
+def test_split_sentences_keeps_abbreviations_intact():
+    """Chữ viết tắt KHÔNG được tách thành mảnh vỡ (bug T1.5 phát hiện)."""
+    text = (
+        "Van Gogh copied works by Millet (q. v.), the painter of peasant life. "
+        "He then joined the Academy."
+    )
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert sentences[0].endswith("the painter of peasant life.")
+    assert "(q. v.)," in sentences[0]
+    # không còn mảnh rác "v. )"
+    assert not any(s.strip().startswith("v.") for s in sentences)
+
+    assert len(split_sentences("J. M. W. Turner was a painter. He lived in London.")) == 2
+    assert len(split_sentences("He was born in the U.S.A. Then he moved.")) == 2
+    assert len(split_sentences("Dr. Smith went home. He slept.")) == 2
+
+
+def test_split_sentences_no_content_is_lost():
+    """Ghép lại các câu phải cho lại toàn bộ nội dung (sau khi bỏ khoảng trắng)."""
+    text = (
+        "Van Gogh copied works by Millet (q. v.), the painter of peasant life. "
+        "He then joined the Academy in 1886."
+    )
+    joined = " ".join(split_sentences(text))
+    assert joined == text
+
+
+def test_split_sentences_handles_unspaced_dotted_abbreviations():
+    """Dữ liệu thật viết ``(q.v.)`` không có khoảng trắng - không được cắt vỡ."""
+    text = (
+        "Van Gogh copied works by Millet (q.v.), the painter of peasant life. "
+        "He then joined the Academy in 1886."
+    )
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert "(q.v.)," in sentences[0]
+    assert not any(s.strip().startswith("v.") for s in sentences)
+
+
+def test_split_sentences_keeps_latin_abbreviations_intact():
+    """``i.e.`` / ``e.g.`` là chữ viết tắt, dấu chấm không phải hết câu."""
+    text = "He sold many works, i.e. landscapes. Then he stopped painting."
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert "i.e. landscapes." in sentences[0]
+
+
+def test_split_sentences_absorbs_closing_quote():
+    """Dấu trích dán ngay sau dấu kết thúc thuộc về câu hiện tại."""
+    text = 'He called it "The Sower." Then he left Paris.'
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert sentences[0] == 'He called it "The Sower."'
+
+
+def test_split_sentences_ignores_footnote_marker():
+    """Số đánh dấu trích dẫn chân bài (``."1``) không phải bắt đầu câu mới."""
+    text = 'Van Gogh painted many works."1 He sold few.2 They were rare.'
+    sentences = split_sentences(text)
+    assert len(sentences) == 3
+    assert sentences[0] == 'Van Gogh painted many works."1'
+    assert sentences[1] == "He sold few.2"
+
+
+def test_split_sentences_handles_version_number():
+    """``v.15.1`` là số phiên bản, dấu chấm không phải hết câu."""
+    text = "See volume v.15.1 for details. The catalogue lists everything."
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert "v.15.1" in sentences[0]
+
+
+def test_split_sentences_ignores_period_inside_brackets():
+    """Dấu kết thúc nằm trong ngoặc không phải hết câu (phiên âm, năm sinh)."""
+    text = "Claude Lorrain (French: [klod lɔ.ʁɛ̃]) was a painter. He was called Gellée."
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert "[klod lɔ.ʁɛ̃])" in sentences[0]
+    assert sentences[1].startswith("He was called")
+
+
+def test_split_sentences_ignores_numbered_list_markers():
+    """Số đánh dấu mục (``2.``) không phải hết câu."""
+    text = "See notes. 2. Reynolds 1996, no. 15.1; Reynolds 1984, no. 17.4."
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert sentences[1].startswith("2. Reynolds")
+
+
+def test_split_sentences_handles_period_before_comma():
+    """``Jansz.,`` / ``etc.,`` -> dấu chấm thuộc về từ, không phải hết câu."""
+    text = "His brother Jan Jansz., nephew Jan Jansz. II, and son David Coecke."
+    sentences = split_sentences(text)
+    assert len(sentences) == 1
+    assert sentences[0] == text
+
+
+def test_split_sentences_handles_ellipsis():
+    """Dấu chấm lửng ``. . .`` được gộp vào câu."""
+    text = "It was, thus, simplifying the painter's métier, . . . a clear break. He agreed."
+    sentences = split_sentences(text)
+    assert len(sentences) == 2
+    assert ". . ." in sentences[0]
+
+
+def test_split_sentences_matches_original_text_exactly():
+    """Bất biến quan trọng: ghép lại các câu phải BẰNG CHÍNH XÁC chuỗi gốc."""
+    text = (
+        'Van Gogh copied works by Millet (q.v.), the painter of peasant life."1 '
+        "He then joined the Academy in 1886. Dr. Smith visited J. M. W. Turner "
+        "in the U.S.A. They discussed v.15.1 of the catalogue."
+    )
+    assert " ".join(split_sentences(text)) == text
 
 
 def test_sha256_json_is_stable_and_order_insensitive():

@@ -81,10 +81,11 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Verify**: `uv run python -m artrag.data.enrich_wiki --limit 30` → in tỉ lệ tìm thấy (mục tiêu ≥60%), in 3 ví dụ (tên → wiki_url).
 - **Chạy đầy đủ**: không giới hạn (khoảng 1.000 artist, khoảng 10 phút).
 
-### [ ] T1.5 Artists + chunk tiểu sử
-- **Files**: `build_kb.py` (thêm `--with-bio`).
+### [x] T1.5 Artists + chunk tiểu sử
+- **Files**: `build_kb.py` (thêm `--with-bio`), `src/artrag/data/artists.py`, `scripts/audit_t15.py`, `tests/test_artists.py`.
 - **Nội dung**: `artists.parquet` (ưu tiên `cma_bio`, sau đó `wiki_summary`); thêm chunk `artist_bio` (artwork_id null, có artist_id).
 - **Verify**: `uv run python -m artrag.data.build_kb --with-bio --check` → in số artist có bio theo nguồn (`cma`/`wikipedia`/`none`).
+- **Ghi chú 2026-11-26 (giai đoạn sửa lỗi)**: sửa `split_sentences` trong `src/artrag/utils/text.py` — dữ liệu thật viết `(q.v.)` (không khoảng trắng) và `."1` (footnote marker) khiến 124 chunk tiểu sử bị cắt vỡ. Bổ sung bộ quy tắc: chữ viết tắt, hấp thụ dấu ngoặc kép, footnote marker, độ sâu ngoặc, số hiệu mục chú thích. Bất biến bắt buộc: `" ".join(split_sentences(text)) == text`. Kết quả: 0/562 bio lệch nguyên văn, 854 chunk `artist_bio` (thay vì 846), `scripts/audit_t15.py` PASS.
 
 ### [ ] T1.6 Tải ảnh (§4 bước 5)
 - **Files**: `src/artrag/data/images.py`.

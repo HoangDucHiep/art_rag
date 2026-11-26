@@ -32,6 +32,8 @@ data:
   wiki_mode: batch
   wiki_batch_size: 25
   wiki_extract_batch_size: 20
+  bio_prefer_cma: true
+  bio_min_chars: 40
 
 index:
   clip_model: clip
