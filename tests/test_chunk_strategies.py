@@ -66,6 +66,37 @@ def test_chunk_items_preserves_text_verbatim():
     assert rebuilt == text
 
 
+def test_chunk_items_keeps_separator_at_chunk_boundary():
+    """Dấu phân cách ở ranh giới giữa hai chunk không được bị mất.
+
+    Nối lại các chunk bằng " " phải khớp đúng văn bản gốc - nếu mất dấu
+    ";" thì nội dung của văn bản nguồn bị thay đổi.
+    """
+    text = "; ".join(f"item {index} with several words to fill" for index in range(20))
+    chunks = chunk_items(text, max_words=20, separator="; ")
+    assert len(chunks) > 1
+    rebuilt = " ".join(chunks)
+    assert " ".join(rebuilt.split()) == " ".join(text.split())
+    # dấu ";" vẫn còn đủ số lần như văn bản gốc
+    assert rebuilt.count(";") == text.count(";")
+
+
+def test_chunk_items_keeps_separator_when_item_too_long():
+    """Mục đơn lẻ quá dài bị cắt cứng vẫn phải bảo toàn nguyên văn."""
+    text = "; ".join(["short one", "w " * 300, "short two"])
+    chunks = chunk_items(text, max_words=250, separator="; ")
+    assert len(chunks) > 1
+    rebuilt = " ".join(chunks)
+    assert " ".join(rebuilt.split()) == " ".join(text.split())
+
+
+def test_chunk_items_handles_trailing_separator():
+    """Văn bản kết thúc bằng dấu phân cách vẫn phải bảo toàn."""
+    text = "A: one; B: two;"
+    chunks = chunk_items(text, max_words=250)
+    assert " ".join(" ".join(chunks).split()) == " ".join(text.split())
+
+
 # --------------------------------------------------------- chunk_semantic (C3)
 def test_chunk_semantic_groups_paragraphs():
     text = ("Para one has five words.\n\n" "Para two has four words.\n\n" "Para three has three words.")

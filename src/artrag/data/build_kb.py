@@ -28,7 +28,6 @@ from artrag.data.artists import (
     chunk_rows_for_artists,
     load_wiki_records,
 )
-from artrag.data.chunking import _field_value
 from artrag.data.chunk_strategies import (
     STRATEGY_ITEM,
     STRATEGY_SEMANTIC,

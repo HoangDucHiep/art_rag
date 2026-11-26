@@ -146,7 +146,7 @@ Quy tắc chunking:
 - Tham số: `semantic_target_words` (120), `semantic_max_words` (250), `semantic_min_words` (40), `item_separator` (`"; "`).
 - **`chunks.parquet`** giữ chiến lược **đang dùng** (mặc định C1); cột `strategy` cho biết chiến lược của từng chunk (giá trị `sentence` cho dữ liệu cũ).
 - **`chunks_variants.parquet`** (sinh bằng `build_kb --with-variants`) chứa **đầy đủ các biến thể** để so sánh: mỗi chunk có `chunk_id` kèm hậu tố `#<strategy>`. Vì C3 chỉ áp cho `artist_bio`/`description` và C2 chỉ áp cho `provenance`/`exhibitions`, hai bảng cho phép so sánh trực tiếp trên cùng một artist / cùng một tác phẩm.
-- **Bất biến**: mọi chiến lược chỉ đổi **vị trí ranh giới**, không đổi nội dung — ghép lại các chunk phải bảo toàn nguyên văn văn bản gốc.
+- **Bất biến**: mọi chiến lược chỉ đổi **vị trí ranh giới**, không đổi nội dung — ghép lại các chunk phải bảo toàn nguyên văn văn bản gốc. Với chiến lược `item`, dấu phân cách `"; "` nằm ở ranh giới giữa hai chunk được **giữ lại** ở cuối chunk trước (kèm khoảng trắng gốc), nên nối lại các chunk bằng `" "` vẫn khớp văn bản gốc.
 
 **Đo đạc ablation chunking** (bổ sung 2026-11-26): module `src/artrag/eval/chunk_eval.py` (hàm thuần, **không cần GPU/model**).
 - Tầng 1 (proxy, làm được ngay): `chunk_profile` (số chunk, độ dài TB, phân bố theo field, % rỗng/vượt 250 từ), `mid_item_cut_rate` (% chunk có ranh giới nằm giữa một mục tự nhiên), `mid_sentence_cut_rate` (% chunk không kết thúc bằng dấu câu), `redundancy` (% token trùng lặp giữa các chunk liền kề, đo bằng **n-gram 3 từ** để không tính nhầm từ thông dụng), `info_coverage` (% token nguồn xuất hiện trong ít nhất một chunk), `verbatim_rate` (% chunk là đoạn con **nguyên văn** của nguồn — chỉ số bắt được lỗi cắt vỡ).

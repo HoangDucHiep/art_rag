@@ -15,13 +15,13 @@ Dùng:
 from __future__ import annotations
 
 import argparse
-import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
+import pandas as pd
+
 from artrag.config import load_config, paths
-from artrag.utils.text import split_sentences
 
 #: Ngưỡng hard-cap của hệ thống (mọi chunk không được vượt).
 MAX_WORDS = 250
@@ -356,8 +356,6 @@ def _load_sources(cfg: Any) -> dict[str, str]:
     - ``provenance:{artwork_id}`` -> cột ``provenance_text``
     - ``exhibitions:{artwork_id}`` -> cột ``exhibitions_text``
     """
-    import pandas as pd
-
     p = paths(cfg)
     sources: dict[str, str] = {}
 
@@ -498,8 +496,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Không có bảng biến thể: {variants_path}")
         print("Chạy: uv run python -m artrag.data.build_kb --with-bio --with-variants")
         return 1
-
-    import pandas as pd
 
     variants = pd.read_parquet(variants_path).to_dict("records")
     if args.variant:

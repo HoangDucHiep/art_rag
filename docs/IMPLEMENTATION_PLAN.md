@@ -87,6 +87,13 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Verify**: `uv run python -m artrag.data.build_kb --with-bio --check` → in số artist có bio theo nguồn (`cma`/`wikipedia`/`none`).
 - **Ghi chú 2026-11-26 (giai đoạn sửa lỗi)**: sửa `split_sentences` trong `src/artrag/utils/text.py` — dữ liệu thật viết `(q.v.)` (không khoảng trắng) và `."1` (footnote marker) khiến 124 chunk tiểu sử bị cắt vỡ. Bổ sung bộ quy tắc: chữ viết tắt, hấp thụ dấu ngoặc kép, footnote marker, độ sâu ngoặc, số hiệu mục chú thích. Bất biến bắt buộc: `" ".join(split_sentences(text)) == text`. Kết quả: 0/562 bio lệch nguyên văn, 854 chunk `artist_bio` (thay vì 846), `scripts/audit_t15.py` PASS.
 
+### [x] T1b Chunking strategies + ablation so sánh
+- **Files**: `src/artrag/data/chunk_strategies.py` (MỚI), `src/artrag/data/chunking.py` (thêm cột `strategy`), `src/artrag/data/artists.py`, `src/artrag/data/build_kb.py` (thêm `--with-variants`), `src/artrag/eval/chunk_eval.py` (MỚI), `configs/experiments/chunk_{sentence,item,semantic,both}.yaml` (MỚI), `tests/test_chunk_strategies.py` (MỚI).
+- **Nội dung**: ba chiến lược — C1 `sentence` (baseline: theo câu, gộp 180 từ, overlap 1 câu), C2 `item` (theo mục tự nhiên `"; "`, áp cho `provenance`/`exhibitions`), C3 `semantic` (theo đoạn văn 120 từ, không overlap, áp cho `artist_bio`/`description`). Chiến lược theo field nằm ở config `data.chunking.strategy_<field>`. `chunks.parquet` giữ nguyên baseline; `chunks_variants.parquet` (17.352 chunk) chứa đầy đủ biến thể với hậu tố `#<strategy>`.
+- **Verify**: `uv run python -m artrag.eval.chunk_eval` → bảng Markdown so sánh 3 chiến lược (proxy metrics, không cần GPU). `uv run pytest -q` → xanh.
+- **Kết quả 2026-11-26**: C2 `item` cắt giữa mục **0,00%** (C1: 2,24%) — loại triệt để lỗi cắt 83/1697 tác phẩm `exhibitions` và 1/2054 `provenance`. C3 `semantic` cắt giữa câu **0,88%** (C1: 37,59%) và redundancy **1,29%** (C1: 13,19%) nhờ không overlap. Tầng 2 (Recall@10 / MRR) **deferred** tới M6/M8.
+- **Ghi chú sửa lỗi sau verify**: `chunk_items` ban đầu mất dấu `;` ở ranh giới giữa 2 chunk, vi phạm bất biến "ghép lại chunk phải khớp nguyên văn". Đã sửa bằng `_split_keep_separator` (tách regex giữ separator) + tách token `\S+\s*` khi cắt cứng mục quá dài. Sau sửa: 0/6.523 bản ghi lệch nguyên văn, `verbatim_rate` của C2 tăng 99,97% → 100,00%.
+
 ### [ ] T1.6 Tải ảnh (§4 bước 5)
 - **Files**: `src/artrag/data/images.py`.
 - **Nội dung**: tải song song (8 thread) → RGB → resize cạnh dài 512px → JPEG q90; bỏ qua file đã có; ghi `images_failed.json`; điền `image_path` vào artworks.

@@ -17,6 +17,7 @@ thay đổi **vị trí ranh giới**, không thay đổi nội dung.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from artrag.utils.text import split_sentences
@@ -109,6 +110,29 @@ def chunk_sentences(
     return [c for c in chunks if c.strip()]
 
 
+def _split_keep_separator(text: str, separator: str) -> list[tuple[str, str]]:
+    """Tách văn bản theo ``separator``, **giữ lại** dấu phân cách.
+
+    Trả về danh sách cặp ``(nội dung, dấu_phân_cách_đứng_sau)``. Nhờ vậy
+    ghép lại các mục (hoặc các chunk) luôn khớp **nguyên văn** với văn bản
+    gốc, kể cả khi ranh giới chunk nằm đúng ở một dấu phân cách.
+    """
+    core = separator.rstrip()
+    if not core:
+        return [(text, "")]
+
+    # Cho phép khoảng trắng linh hoạt sau dấu phân cách ("; ", ";  ", ";\n").
+    pattern = re.compile(f"({re.escape(core)}\\s*)")
+    parts = pattern.split(text)
+
+    cells: list[tuple[str, str]] = []
+    for index in range(0, len(parts), 2):
+        content = parts[index]
+        sep = parts[index + 1] if index + 1 < len(parts) else ""
+        cells.append((content, sep))
+    return cells
+
+
 def chunk_items(
     text: str,
     max_words: int = 250,
@@ -122,45 +146,69 @@ def chunk_items(
 
     Với chiến lược này, **không có mảnh nào kết thúc giữa một mục** (trừ
     trường hợp một mục đơn lẻ quá dài).
+
+    Bất biến: nối lại các chunk bằng ``" "`` phải cho ra đúng văn bản gốc
+    (sau khi chuẩn hóa khoảng trắng). Dấu phân cách nằm ở ranh giới giữa
+    hai chunk được giữ lại (kèm khoảng trắng gốc) ở cuối chunk trước.
     """
     if not text or not text.strip():
         return []
 
-    items = [item.strip() for item in text.split(separator)]
-    items = [item for item in items if item]
-    if not items:
-        return []
+    cells = _split_keep_separator(text, separator)
 
-    chunks: list[str] = []
-    current: list[str] = []
-    current_words = 0
-
-    for item in items:
-        item_words = count_words(item)
-        if item_words > max_words:
-            # mục đơn lẻ quá dài -> cắt cứng theo từ (không có cách nào khác)
-            if current:
-                chunks.append(separator.join(current))
-                current, current_words = [], 0
-            words = item.split()
-            for start in range(0, len(words), max_words):
-                piece = " ".join(words[start : start + max_words]).strip()
-                if piece:
-                    chunks.append(piece)
+    # Đơn vị cấp thành chunk: (nội dung thô, dấu_phân_cách_sau, là_đầu_mục).
+    # "Nội dung thô" giữ nguyên khoảng trắng gốc để nối lại được nguyên văn.
+    units: list[tuple[str, str, bool]] = []
+    for content, sep in cells:
+        if not content.strip():
+            # Ô rỗng: chỉ giữ dấu phân cách, gộp vào ô trước.
+            if sep and units:
+                previous = units[-1]
+                units[-1] = (previous[0], previous[1] + sep, previous[2])
             continue
 
-        if current_words + item_words > max_words and current:
-            chunks.append(separator.join(current))
+        if count_words(content) > max_words:
+            # Mục đơn lẻ quá dài -> cắt cứng theo từ (không có cách nào khác).
+            # Tách theo "từ + khoảng trắng đi kèm" để không mất khoảng trắng gốc.
+            tokens = re.findall(r"\S+\s*", content)
+            total = len(tokens)
+            for start in range(0, total, max_words):
+                piece = "".join(tokens[start : start + max_words])
+                is_last = start + max_words >= total
+                units.append((piece, sep if is_last else "", start == 0))
+            continue
+
+        units.append((content, sep, True))
+
+    if not units:
+        return []
+
+    groups: list[list[tuple[str, str, bool]]] = []
+    current: list[tuple[str, str, bool]] = []
+    current_words = 0
+
+    for unit in units:
+        unit_words = count_words(unit[0])
+        if current_words + unit_words > max_words and current:
+            groups.append(current)
+            current, current_words = [], 0
+        current.append(unit)
+        current_words += unit_words
+        if not unit[2]:
+            # Mục này đã bị cắt cứng -> buộc phải ngắt chunk tại đây.
+            groups.append(current)
             current, current_words = [], 0
 
-        current.append(item)
-        current_words += item_words
-
     if current:
-        chunk = separator.join(current).strip()
+        groups.append(current)
+
+    chunks: list[str] = []
+    for group in groups:
+        chunk = "".join(f"{content}{sep}" for content, sep, _ in group).strip()
         if chunk:
             chunks.append(chunk)
-    return [c for c in chunks if c.strip()]
+
+    return [chunk for chunk in chunks if chunk.strip()]
 
 
 def chunk_semantic(
@@ -296,7 +344,9 @@ def make_chunk_rows_for_strategy(
             continue
         words = piece.split()
         if len(words) > max_words_per_chunk:
-            piece = " ".join(words[:max_words_per_chunk])
+            # Giữ dấu phân cách ở cuối nếu có (chiến lược `item`).
+            tail = piece[-1] if piece.endswith(";") else ""
+            piece = " ".join(words[:max_words_per_chunk]) + tail
         rows.append(
             {
                 "chunk_id": f"{chunk_id_prefix}#{field}#{index}",

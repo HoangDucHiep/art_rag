@@ -25,7 +25,7 @@ from artrag.data.chunk_strategies import (
     STRATEGY_SENTENCE,
     apply_strategy,
 )
-from artrag.data.chunking import CHUNK_COLUMNS, chunk_sentences, count_words
+from artrag.data.chunking import CHUNK_COLUMNS, count_words
 
 # nguồn của nội dung tiểu sử
 BIO_SOURCE_CMA = "cma"
@@ -70,15 +70,6 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _is_blank(value: Any) -> bool:
-    """Giá trị rỗng (None, chuỗi rỗng, NaN)."""
-    if value is None:
-        return True
-    if isinstance(value, float) and value != value:
-        return True
-    return not str(value).strip()
 
 
 # ---------------------------------------------------------------- inputs

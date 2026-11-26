@@ -4,9 +4,10 @@
 #   - `provenance`  (mỗi entry là "date: description")
 #   - `exhibitions` (mỗi mục là "title (description)")
 #
-# Vấn đề baseline C1: `provenance` có 266/2055 chunk kết thúc giữa một mục,
-# `exhibitions` có 84/1697 tác phẩm bị cắt thành nhiều chunk. C2 sửa đúng lỗi
-# đó (chỉ cắt cứng khi một mục đơn lẻ dài quá 250 từ).
+# Vấn đề baseline C1: `exhibitions` có 84/1697 tác phẩm bị cắt thành nhiều
+# chunk (166 chunk kết thúc giữa một mục), `provenance` có 2 chunk kết thúc
+# giữa một mục. C2 sửa đúng lỗi đó (chỉ cắt cứng khi một mục đơn lẻ dài
+# quá 250 từ).
 #
 #   uv run python -m artrag.eval.chunk_eval --variant item
 #   uv run python -m artrag.data.build_kb --with-bio
