@@ -94,15 +94,16 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Kết quả 2026-11-26**: C2 `item` cắt giữa mục **0,00%** (C1: 2,24%) — loại triệt để lỗi cắt 83/1697 tác phẩm `exhibitions` và 1/2054 `provenance`. C3 `semantic` cắt giữa câu **0,88%** (C1: 37,59%) và redundancy **1,29%** (C1: 13,19%) nhờ không overlap. Tầng 2 (Recall@10 / MRR) **deferred** tới M6/M8.
 - **Ghi chú sửa lỗi sau verify**: `chunk_items` ban đầu mất dấu `;` ở ranh giới giữa 2 chunk, vi phạm bất biến "ghép lại chunk phải khớp nguyên văn". Đã sửa bằng `_split_keep_separator` (tách regex giữ separator) + tách token `\S+\s*` khi cắt cứng mục quá dài. Sau sửa: 0/6.523 bản ghi lệch nguyên văn, `verbatim_rate` của C2 tăng 99,97% → 100,00%.
 
-### [ ] T1.6 Tải ảnh (§4 bước 5)
-- **Files**: `src/artrag/data/images.py`.
+### [x] T1.6 Tải ảnh (§4 bước 5) (2026-11-26)
+- **Files**: `src/artrag/data/images.py`, `tests/test_images.py`.
 - **Nội dung**: tải song song (8 thread) → RGB → resize cạnh dài 512px → JPEG q90; bỏ qua file đã có; ghi `images_failed.json`; điền `image_path` vào artworks.
 - **Verify**: `uv run python -m artrag.data.images --limit 20` → 20 file, kích thước max 512px; sau đó chạy đầy đủ và `--check` in số ảnh = số tác phẩm (trừ ảnh lỗi) và tổng dung lượng.
-- **Lưu ý**: tác phẩm có ảnh lỗi bị loại khỏi KB (rebuild KB với `--require-image`).
+- **Lưu ý (chốt 2026-11-26)**: tác phẩm tải ảnh lỗi **vẫn giữ trong KB** với `image_path = null` — KHÔNG loại khỏi KB và KHÔNG rebuild với `--require-image`. Lý do: cột `image_path` nullable theo §2.3; nhánh BGE-M3 vẫn phục vụ câu hỏi metadata; nhánh CLIP chỉ trả tác phẩm có ảnh và §5.3 quy định "vắng ở nhánh nào thì nhận 0"; `abstain.py` R3 MISSING_FIELD từ chối câu hỏi VISUAL thiếu ảnh. Thêm `--retry-failed` để tải lại nhóm lỗi mà không tải lại toàn bộ. `build_kb` phải giữ `image_path` cũ nếu file ảnh còn tồn tại.
+- **Kết quả 2026-11-26 (verify độc lập bằng subagent)**: tải đủ **2.210/2.210 ảnh**, **0 lỗi**, tổng **110,6 MB**. Mọi file đều là JPEG/RGB với cạnh dài ≤ 512px; `artworks.parquet` có cột `image_path` khớp 1-1 với file trên đĩa. `uv run pytest -q` → **243 passed**.
 
 ### [ ] T1.7 Đóng gói artefact
-- **Files**: `src/artrag/tools/artifacts.py`.
-- **Nội dung**: `pack` (zip các thư mục kb, images, index, cache/captions*) và `unpack <zip>`; in kích thước.
+- **Files**: `src/artrag/tools/artifacts.py`, `src/artrag/tools/__init__.py`, `tests/test_artifacts.py`.
+- **Nội dung**: `pack` (zip các thư mục kb, images, index, cache/captions*) và `unpack <zip>`; in kích thước; kèm `manifest.json` trong zip (parts/files/bytes/kb_hash) để `unpack` đối chiếu.
 - **Verify**: `uv run python -m artrag.tools.artifacts pack --only kb,images` → tạo zip; `unpack` vào thư mục tạm thì số file khớp.
 - **Sau task**: upload zip lên Google Drive và tạo Kaggle Dataset (thủ công, người dùng làm).
 

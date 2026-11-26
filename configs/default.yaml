@@ -8,6 +8,12 @@ data:
   cma_type: Painting
   min_description_chars: 50
   image_max_side: 512
+  image_quality: 90
+  image_workers: 8
+  image_timeout_s: 30
+  image_max_retries: 3
+  image_backoff_s: 2.0
+  image_user_agent: "artrag/0.1 (educational RAG project; contact: local)"
   cma_api_base: "https://openaccess-api.clevelandart.org/api/artworks/"
   cma_page_size: 1000
   cma_timeout_s: 60

@@ -184,6 +184,7 @@ data/                         # gitignore; gốc lấy từ ARTRAG_DATA_DIR (m�
   raw/wiki/{artist_id}.json       # kết quả Wikidata/Wikipedia (kể cả "not found")
   kb/{artworks,artists,chunks}.parquet
   images/{artwork_id}.jpg         # RGB, cạnh dài 512px, JPEG q=90
+  images_failed.json               # artwork_id -> lý do lỗi tải ảnh (ở gốc data/, ngoài images/)
   index/clip-{tag}/{emb.npy, ids.json, faiss.index, meta.json}
   index/text-{tag}/{emb.npy, ids.json, faiss.index, meta.json}
   cache/captions-{tag}.parquet
@@ -195,6 +196,20 @@ results/{experiment}/{predictions.jsonl, metrics.json, config.yaml}
 `meta.json` của mỗi index gồm: model id, revision, dim, n, `kb_hash` (hash của `ids`/nội dung nguồn), created_at, thời gian build. Khi online, nếu `kb_hash` lệch so với KB hiện tại thì báo lỗi `StaleIndexError` kèm lệnh build lại.
 
 **Phân phối artefact**: `python -m artrag.tools.artifacts pack` nén `kb/ images/ index/ cache/captions*` thành `artifacts.zip` (khoảng 450MB) để đưa lên Google Drive hoặc Kaggle Dataset; lệnh `unpack` giải nén ở máy local. README có hướng dẫn tái tạo đầy đủ từ đầu (fetch → build → index).
+
+**Quy tắc tải ảnh** (bổ sung 2026-11-26, T1.6) — module `src/artrag/data/images.py`:
+- Nguồn danh sách là `kb/artworks.parquet` (cột `image_url`); tải **song song** bằng `ThreadPoolExecutor` với `data.image_workers` (mặc định 8) luồng, mỗi luồng có `requests.Session` riêng và `User-Agent` chung; retry + backoff cho HTTP 5xx/429.
+- Chuẩn hóa ảnh: mở bằng Pillow → ép `RGB` (ảnh CMA có thể là CMYK/grayscale/alpha) → resize theo **cạnh dài** về `data.image_max_side` (512px), giữ tỷ lệ, `Image.LANCZOS` → lưu JPEG `quality=data.image_quality` (90).
+- File đặt tại `images/{artwork_id}.jpg`; **bỏ qua file đã tồn tại** (idempotent) trừ khi `--force`.
+- Lỗi (URL hỏng, HTTP lỗi, file hỏng) được ghi vào `data/images_failed.json` (map `artwork_id` → lý do). Lệnh `--retry-failed` chỉ thử lại nhóm lỗi này, không tải lại toàn bộ.
+- `image_path` trong `artworks.parquet` là đường dẫn **tương đối so với `data/`** (vd `images/cma-151904.jpg`).
+- **Tác phẩm tải ảnh lỗi vẫn GIỮ trong KB** với `image_path = null` (không loại khỏi KB). Lý do: `image_path` là cột nullable theo §2.3; nhánh văn bản BGE-M3 vẫn phục vụ được các câu hỏi ARTIST/DATE/MEDIUM/PROVENANCE/ARTIST_BIO; nhánh CLIP chỉ trả tác phẩm **có** ảnh (vì index ảnh dựng từ file JPEG) và §5.3 đã quy định "tác phẩm vắng mặt ở nhánh nào thì nhận điểm 0"; câu hỏi VISUAL cần ảnh mà top-1 không có ảnh sẽ bị `abstain.py` từ chối bằng R3 MISSING_FIELD thay vì bịa mô tả.
+- `build_kb` khi ghi lại `artworks.parquet` phải **giữ** giá trị `image_path` cũ nếu file ảnh còn tồn tại trên đĩa (tránh mất dữ liệu khi rebuild KB).
+
+**Quy tắc đóng gói artefact** (bổ sung 2026-11-26, T1.7) — module `src/artrag/tools/artifacts.py`:
+- `pack` nén `kb/`, `images/`, `index/` và **chỉ** `cache/captions*` (không gom `cache/llm`, `cache/translate`, `cache/vqa` vì phụ thuộc máy và dung lượng lớn).
+- Mỗi zip có `manifest.json` ở gối: `{created_at, parts: {name: {files, bytes}}, total_files, total_bytes, kb_hash}` — `kb_hash` là hash ổn định của tập `(artwork_id, image_path)` trong `artworks.parquet`.
+- `unpack` giải nén và đối chiếu số file theo từng part với manifest, in báo cáo khớp/lệch.
 
 ---
 
@@ -248,7 +263,7 @@ flowchart LR
 | 2 | `artrag.data.build_kb` | raw → `kb/artworks.parquet` (lọc có description) | ghi đè toàn bộ; `--check` in thống kê | local |
 | 3 | `artrag.data.enrich_wiki` | artists → `raw/wiki/*.json` | cache theo artist_id, kể cả not-found; ≤ 5 req/s, User-Agent chung | local |
 | 4 | `artrag.data.build_kb --with-bio` | + `artists.parquet`, `chunks.parquet` | ghi đè | local |
-| 5 | `artrag.data.images` | image_url → `images/*.jpg` | bỏ qua file đã có; ghi lại lỗi vào `images_failed.json` | local |
+| 5 | `artrag.data.images` | image_url → `images/*.jpg` | bỏ qua file đã có; ghi lại lỗi vào `images_failed.json`; điền `image_path` trong `artworks.parquet` | local |
 | 6 | `artrag.index.clip_index build` | images → `index/clip-*` | so `kb_hash`; batch 64 (GPU) / 16 (CPU); L2 normalize | Colab/Kaggle |
 | 7 | `artrag.index.text_index build` | chunks → `index/text-*` | như trên; BGE-M3 dense, max_len 512 | Colab/Kaggle |
 | 8 | `artrag.index.captions build` | images → `cache/captions-*.parquet` | chỉ caption ảnh chưa có; BLIP-base, beam 3, max_new_tokens 30 | Colab/Kaggle |

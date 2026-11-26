@@ -341,6 +341,51 @@ def write_parquet(rows: list[dict[str, Any]], columns: list[str], path: Path) ->
     return path
 
 
+def preserve_image_paths(
+    rows: list[dict[str, Any]],
+    kb_path: str | Path,
+    images_dir: str | Path,
+) -> int:
+    """Giữ cột ``image_path`` cũ khi rebuild KB (nếu file ảnh còn tồn tại).
+
+    T1.6 tải ảnh và điền ``image_path`` vào ``artworks.parquet``. Nếu chạy lại
+    ``build_kb`` mà không có bước này thì cột đó bị mất (ghi đè toàn bộ).
+    Ở đây ta giữ lại giá trị cũ **chỉ khi** file ảnh tương ứng vẫn còn trên
+    đĩa; ngược lại đặt ``None``.
+    """
+    p = Path(kb_path)
+    if not p.exists():
+        return 0
+    try:
+        old = pd.read_parquet(p)
+    except (OSError, ValueError):
+        return 0
+    if "artwork_id" not in old.columns or "image_path" not in old.columns:
+        return 0
+
+    images_dir = Path(images_dir)
+    previous: dict[str, str] = {}
+    for artwork_id, image_path in zip(old["artwork_id"], old["image_path"]):
+        if artwork_id is None or image_path is None:
+            continue
+        previous[str(artwork_id)] = str(image_path)
+
+    kept = 0
+    for row in rows:
+        artwork_id = row.get("artwork_id")
+        if artwork_id is None:
+            row["image_path"] = None
+            continue
+        artwork_id = str(artwork_id)
+        image_path = previous.get(artwork_id)
+        if image_path and (images_dir / Path(image_path).name).exists():
+            row["image_path"] = image_path
+            kept += 1
+        else:
+            row["image_path"] = None
+    return kept
+
+
 # ---------------------------------------------------------------- check
 def print_stats(
     rows: list[dict[str, Any]],
@@ -469,9 +514,13 @@ def main(argv: list[str] | None = None) -> int:
         variants = make_variant_chunk_rows(rows, artist_rows, cfg)
 
     if not args.check:
+        # giữ image_path đã tải ở T1.6 nếu file ảnh còn tồn tại
+        kept = preserve_image_paths(rows, p.kb / "artworks.parquet", p.images)
         write_parquet(rows, ARTWORK_COLUMNS, p.kb / "artworks.parquet")
         write_parquet(chunks, CHUNK_COLUMNS, p.kb / "chunks.parquet")
         print(f"Đã ghi {p.kb / 'artworks.parquet'}")
+        if kept:
+            print(f"Giữ {kept} image_path (file ảnh còn tồn tại)")
         print(f"Đã ghi {p.kb / 'chunks.parquet'}")
         if args.with_bio:
             write_parquet(artist_rows, ARTIST_COLUMNS, p.kb / "artists.parquet")
