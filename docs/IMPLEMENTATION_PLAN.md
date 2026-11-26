@@ -112,10 +112,12 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 
 ## M2. Registry và backend LLM (tuần 1–2)
 
-### [ ] T2.1 Registry lõi, không có model thật (§6.2)
+### [x] T2.1 Registry lõi, không có model thật (§6.2) (2026-11-26)
 - **Files**: `src/artrag/registry.py`, `configs/models.yaml`, `tests/test_registry.py`.
 - **Nội dung**: `ModelSpec`, `ModelHandle`; `@register_loader(task)`; `DeviceManager` (interface có `available()`, `mem_allocated()`, `empty_cache()`, có bản giả để test); lazy get, khóa theo tên, LRU với ngân sách và pinned, OOM → evict → thử lại → CPU; `stats()`.
 - **Verify**: `uv run pytest tests/test_registry.py -q`. Các test dùng loader giả và GPU giả: (a) chỉ nạp một lần, (b) vượt ngân sách thì evict đúng model LRU, không evict model pinned, (c) OOM thì fallback sang cpu, (d) `stats()` đúng.
+- **Kết quả 2026-11-26 (verify độc lập bằng subagent)**: `tests/test_registry.py` → **26 passed**; toàn bộ suite → **289 passed** (263 cũ + 26 mới). `src/artrag/registry.py` **không import torch ở thời điểm import** (torch chỉ được import lazy trong `TorchDeviceManager`) nên module import được khi chưa cài torch — torch sẽ thêm ở T2.2. `configs/models.yaml` khớp **100%** với bảng model trong §6.2 (11 model, cùng `task`/`hf_id`/`est_vram_mb`).
+- **Ghi chú thiết kế**: thêm khối `models:` (chỉ có `evict_to: cpu`) vào `configs/default.yaml`; `configs/models.yaml` nằm **ngoài** chuỗi gộp §6.1 và được nạp riêng bởi `load_model_specs(cfg)`, thứ tự `configs/models.yaml` < `cfg["models"]` (profile/experiment/--set) — `configs/profiles/local.yaml` đã có sẵn khối `models:` (ghim `clip`, đẩy `text_embed`/`vi2en`/`en2vi` về CPU) và nay được dùng thật.
 
 ### [ ] T2.2 Loader thật cho model thị giác và embedding
 - **Files**: `src/artrag/models/loaders.py` (đăng ký clip, sbert, blip_itm, blip_cap, blip_vqa, seq2seq, nli), `src/artrag/registry.py` (`--smoke`).

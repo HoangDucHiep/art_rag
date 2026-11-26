@@ -62,6 +62,13 @@ index:
   text_model: text_embed
   batch_size: 64
 
+# Cấu hình registry (SYSTEM_DESIGN 6.2). Danh mục model nằm ở configs/models.yaml;
+# khối `models:` dưới đây chỉ chứa ghi đè theo profile/experiment/--set.
+models:
+  # evict_to: "cpu" -> khi bị giải phóng LRU vì hết VRAM thì model được nạp lại
+  # trên CPU (vẫn dùng được, chậm hơn). "free" -> xoá hẳn khỏi registry.
+  evict_to: cpu
+
 query:
   translator: vinai
   clip_template: T1
