@@ -1,0 +1,18 @@
+# C1 `sentence` - chiến lược BASELINE (mặc định của toàn hệ thống).
+# Tách theo câu, gộp 180 từ, overlap 1 câu; field danh sách cắt cứng ở 250 từ.
+#
+# Dùng để đo baseline của ablation T1b (chunking):
+#   uv run python -m artrag.eval.chunk_eval --variant sentence
+#
+# Lưu ý: file này chỉ ghi đè `data.chunking.strategy_*`. Cần rebuild KB sau khi
+# đổi chiến lược:
+#   uv run python -m artrag.data.build_kb --with-bio
+
+data:
+  chunking:
+    strategy_description: sentence
+    strategy_did_you_know: sentence
+    strategy_overview: sentence
+    strategy_provenance: sentence
+    strategy_exhibitions: sentence
+    strategy_artist_bio: sentence

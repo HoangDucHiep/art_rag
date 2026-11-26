@@ -20,6 +20,22 @@ data:
     overlap_sentences: 1
     max_words_per_chunk: 250
     max_exhibitions: 10
+    # --- Chiến lược chunking (T1.5, ablation T1b) ---
+    # `sentence` = C1 (baseline, mặc định cho mọi field)
+    # `item`     = C2 (tách theo mục tự nhiên, dùng cho field danh sách)
+    # `semantic` = C3 (tách theo đoạn văn, dùng cho field văn xuôi dài)
+    strategy_description: sentence
+    strategy_did_you_know: sentence
+    strategy_overview: sentence
+    strategy_provenance: sentence
+    strategy_exhibitions: sentence
+    strategy_artist_bio: sentence
+    semantic_target_words: 120
+    semantic_max_words: 250
+    semantic_min_words: 40
+    item_separator: "; "
+    # Sinh bảng biến thể đầy đủ (C1 + C2 + C3) để so sánh trong báo cáo.
+    write_variants: false
   wiki_search_limit: 10
   wiki_label_threshold: 88
   wiki_birth_tolerance: 3

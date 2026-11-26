@@ -1,0 +1,24 @@
+# C3 `semantic` - tách theo ĐOẠN VĂN có nghĩa, không overlap.
+#
+# Áp dụng cho hai field văn xuôi dài:
+#   - `artist_bio`  (tiểu sử họa sĩ)
+#   - `description` (mô tả tác phẩm)
+#
+# Vấn đề baseline C1: `artist_bio` có redundancy 13,4% do overlap 1 câu và
+# 14/846 chunk bị cắt giữa câu; `description` có 16/2303 chunk bị cắt giữa
+# câu. C3 gom theo đoạn văn (target 120 từ, hard-cap 250), không overlap.
+#
+#   uv run python -m artrag.eval.chunk_eval --variant semantic
+#   uv run python -m artrag.data.build_kb --with-bio
+
+data:
+  chunking:
+    strategy_description: semantic
+    strategy_did_you_know: sentence
+    strategy_overview: sentence
+    strategy_provenance: sentence
+    strategy_exhibitions: sentence
+    strategy_artist_bio: semantic
+    semantic_target_words: 120
+    semantic_max_words: 250
+    semantic_min_words: 40

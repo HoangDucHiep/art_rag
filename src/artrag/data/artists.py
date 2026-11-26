@@ -21,6 +21,10 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
+from artrag.data.chunk_strategies import (
+    STRATEGY_SENTENCE,
+    apply_strategy,
+)
 from artrag.data.chunking import CHUNK_COLUMNS, chunk_sentences, count_words
 
 # nguồn của nội dung tiểu sử
@@ -203,6 +207,11 @@ def make_artist_bio_chunks(
     sentence_max_words: int = 180,
     overlap_sentences: int = 1,
     max_words_per_chunk: int = 250,
+    strategy: str = STRATEGY_SENTENCE,
+    item_separator: str = "; ",
+    semantic_target_words: int = 120,
+    semantic_max_words: int = 250,
+    semantic_min_words: int = 40,
 ) -> list[dict[str, Any]]:
     """Tách tiểu sử họa sĩ thành các chunk ``artist_bio``.
 
@@ -211,6 +220,9 @@ def make_artist_bio_chunks(
 
     ``source_url`` lấy theo nguồn của tiểu sử: nếu nguồn là Wikipedia thì dùng
     URL bài viết, ngược lại dùng URL tác phẩm CMA đầu tiên của họa sĩ đó.
+
+    ``strategy`` chọn chiến lược chunking (``sentence`` / ``item`` /
+    ``semantic``) - xem ``artrag.data.chunk_strategies``.
     """
     source_url_by_artist = source_url_by_artist or {}
     rows: list[dict[str, Any]] = []
@@ -228,7 +240,16 @@ def make_artist_bio_chunks(
         if not source_url:
             source_url = _clean(source_url_by_artist.get(artist_id))
 
-        pieces = chunk_sentences(bio, sentence_max_words, overlap_sentences)
+        pieces = apply_strategy(
+            bio,
+            strategy=strategy,
+            sentence_max_words=sentence_max_words,
+            overlap_sentences=overlap_sentences,
+            item_separator=item_separator,
+            semantic_target_words=semantic_target_words,
+            semantic_max_words=semantic_max_words,
+            semantic_min_words=semantic_min_words,
+        )
         for index, piece in enumerate(pieces):
             piece = piece.strip()
             if not piece:
@@ -245,6 +266,7 @@ def make_artist_bio_chunks(
                     "text": piece,
                     "source_url": source_url,
                     "n_words": count_words(piece),
+                    "strategy": strategy,
                 }
             )
     return rows
@@ -256,6 +278,11 @@ def chunk_rows_for_artists(
     sentence_max_words: int = 180,
     overlap_sentences: int = 1,
     max_words_per_chunk: int = 250,
+    strategy: str = STRATEGY_SENTENCE,
+    item_separator: str = "; ",
+    semantic_target_words: int = 120,
+    semantic_max_words: int = 250,
+    semantic_min_words: int = 40,
 ) -> list[dict[str, Any]]:
     """Wrapper có đúng thứ tự cột ``CHUNK_COLUMNS``."""
     rows = make_artist_bio_chunks(
@@ -264,5 +291,10 @@ def chunk_rows_for_artists(
         sentence_max_words=sentence_max_words,
         overlap_sentences=overlap_sentences,
         max_words_per_chunk=max_words_per_chunk,
+        strategy=strategy,
+        item_separator=item_separator,
+        semantic_target_words=semantic_target_words,
+        semantic_max_words=semantic_max_words,
+        semantic_min_words=semantic_min_words,
     )
     return [{column: row.get(column) for column in CHUNK_COLUMNS} for row in rows]

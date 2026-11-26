@@ -134,6 +134,25 @@ Quy tắc chunking:
 - Một số `description` của CMA cũng thiếu khoảng trắng sau dấu chấm (vd `northern Italy.The son`) — cùng tính chất, giữ nguyên.
 - Vài `bio` của CMA vốn đã **lệch ngoặc** (vd `cma-artist-2715`: 4 ngoặc mở, 5 ngoặc đóng) — không phải lỗi tách câu.
 
+**Ba chiến lược chunking (bổ sung 2026-11-26, ablation T1b)** — module `src/artrag/data/chunk_strategies.py`:
+
+| Mã | Tên | Cách cắt | Field áp dụng (thử nghiệm) |
+|---|---|---|---|
+| C1 | `sentence` (baseline) | theo câu, gộp 180 từ, overlap 1 câu | tất cả (mặc định) |
+| C2 | `item` | theo mục tự nhiên (`; `) | `provenance`, `exhibitions` |
+| C3 | `semantic` | theo đoạn văn 120 từ, không overlap | `artist_bio`, `description` |
+
+- Chiến lược cho từng field nằm ở config `data.chunking.strategy_<field>` (giá trị `sentence` | `item` | `semantic`). Field không khai báo -> `sentence`. Mặc định của hệ thống **giữ nguyên C1** để không phá pipeline.
+- Tham số: `semantic_target_words` (120), `semantic_max_words` (250), `semantic_min_words` (40), `item_separator` (`"; "`).
+- **`chunks.parquet`** giữ chiến lược **đang dùng** (mặc định C1); cột `strategy` cho biết chiến lược của từng chunk (giá trị `sentence` cho dữ liệu cũ).
+- **`chunks_variants.parquet`** (sinh bằng `build_kb --with-variants`) chứa **đầy đủ các biến thể** để so sánh: mỗi chunk có `chunk_id` kèm hậu tố `#<strategy>`. Vì C3 chỉ áp cho `artist_bio`/`description` và C2 chỉ áp cho `provenance`/`exhibitions`, hai bảng cho phép so sánh trực tiếp trên cùng một artist / cùng một tác phẩm.
+- **Bất biến**: mọi chiến lược chỉ đổi **vị trí ranh giới**, không đổi nội dung — ghép lại các chunk phải bảo toàn nguyên văn văn bản gốc.
+
+**Đo đạc ablation chunking** (bổ sung 2026-11-26): module `src/artrag/eval/chunk_eval.py` (hàm thuần, **không cần GPU/model**).
+- Tầng 1 (proxy, làm được ngay): `chunk_profile` (số chunk, độ dài TB, phân bố theo field, % rỗng/vượt 250 từ), `mid_item_cut_rate` (% chunk có ranh giới nằm giữa một mục tự nhiên), `mid_sentence_cut_rate` (% chunk không kết thúc bằng dấu câu), `redundancy` (% token trùng lặp giữa các chunk liền kề, đo bằng **n-gram 3 từ** để không tính nhầm từ thông dụng), `info_coverage` (% token nguồn xuất hiện trong ít nhất một chunk), `verbatim_rate` (% chunk là đoạn con **nguyên văn** của nguồn — chỉ số bắt được lỗi cắt vỡ).
+- CLI: `uv run python -m artrag.eval.chunk_eval --variant sentence --variant item --variant semantic` -> bảng Markdown + CSV (`--csv`, `--markdown`).
+- Tầng 2 (Recall@K / MRR của nhánh BGE-M3) **deferred** tới T6/T8 vì cần text index (T3.2) và bộ câu hỏi (T6.1). Cột Recall@10 / MRR trong báo cáo để trống cho tới lúc đó, ghi rõ "đo ở M6/M8".
+
 **`captions.parquet`** (trong `data/cache/`): artwork_id, model, params_hash, caption, ms.
 
 **Quy tắc match artist <-> Wikidata** (bổ sung 2026-11-25, T1.4):

@@ -1,0 +1,21 @@
+# C2 + C3 - kết hợp cả hai chiến lược thử nghiệm.
+#
+#   - `provenance`, `exhibitions` -> C2 `item`      (không cắt giữa một mục)
+#   - `artist_bio`, `description` -> C3 `semantic` (theo đoạn văn, không overlap)
+#   - `did_you_know`, `overview`  -> C1 `sentence` (baseline)
+#
+#   uv run python -m artrag.eval.chunk_eval --variant sentence --variant item --variant semantic
+#   uv run python -m artrag.data.build_kb --with-bio
+
+data:
+  chunking:
+    strategy_description: semantic
+    strategy_did_you_know: sentence
+    strategy_overview: sentence
+    strategy_provenance: item
+    strategy_exhibitions: item
+    strategy_artist_bio: semantic
+    semantic_target_words: 120
+    semantic_max_words: 250
+    semantic_min_words: 40
+    item_separator: "; "

@@ -13,6 +13,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from artrag.data.chunk_strategies import (
+    STRATEGY_SENTENCE,
+    apply_strategy,
+)
 from artrag.data.cma_parse import overview_text
 from artrag.utils.text import split_sentences
 
@@ -30,6 +34,7 @@ CHUNK_COLUMNS = [
     "text",
     "source_url",
     "n_words",
+    "strategy",
 ]
 
 
@@ -117,27 +122,58 @@ def make_chunk_rows(
     field_max_words: int = 250,
     overlap_sentences: int = 1,
     max_words_per_chunk: int = 250,
+    strategies: dict[str, str] | None = None,
+    item_separator: str = "; ",
+    semantic_target_words: int = 120,
+    semantic_max_words: int = 250,
+    semantic_min_words: int = 40,
 ) -> list[dict[str, Any]]:
     """Sinh các dòng chunk cho một tác phẩm (theo thứ tự field).
 
     ``chunk_id`` = ``{artwork_id}#{field}#{i}`` với ``i`` bắt đầu từ 0.
+
+    ``strategies`` cho phép gán chiến lược chunking **riêng cho từng field**
+    (xem ``data.chunking.strategy_<field>`` trong config). Field không có
+    trong dict thì dùng chiến lược mặc định ``sentence`` (C1 baseline), nhờ
+    vậy hành vi hiện tại được giữ nguyên.
     """
     artwork_id = row.get("artwork_id")
     artist_id = row.get("artist_id")
     source_url = row.get("source_url")
     rows: list[dict[str, Any]] = []
+    strategies = strategies or {}
 
     for field in CHUNK_FIELDS:
         text = _field_value(row, field)
         if not text or not text.strip():
             continue
 
-        if field == "overview":
-            pieces = chunk_single(text, max_words_per_chunk)
-        elif field in SENTENCE_FIELDS:
-            pieces = chunk_sentences(text, sentence_max_words, overlap_sentences)
+        strategy = strategies.get(field) or STRATEGY_SENTENCE
+        if strategy == STRATEGY_SENTENCE:
+            # Baseline (C1): giữ đúng hành vi gốc của T1.3.
+            # - `overview`: một chunk (cắt cứng theo từ).
+            # - field văn xuôi: tách câu, gộp 180 từ, overlap 1 câu.
+            # - field danh sách (provenance/exhibitions): cắt cứng theo từ ở
+            #   `field_max_words` (KHÔNG cắt theo câu - đây chính là lỗi
+            #   "cắt giữa một mục" mà chiến lược C2 `item` sẽ sửa).
+            if field == "overview":
+                pieces = chunk_single(text, max_words_per_chunk)
+            elif field in SENTENCE_FIELDS:
+                pieces = chunk_sentences(text, sentence_max_words, overlap_sentences)
+            else:
+                pieces = chunk_single(text, field_max_words)
         else:
-            pieces = chunk_single(text, field_max_words)
+            pieces = apply_strategy(
+                text,
+                strategy=strategy,
+                sentence_max_words=sentence_max_words,
+                overlap_sentences=overlap_sentences,
+                field_max_words=field_max_words,
+                item_separator=item_separator,
+                semantic_target_words=semantic_target_words,
+                semantic_max_words=semantic_max_words,
+                semantic_min_words=semantic_min_words,
+            )
 
         for index, piece in enumerate(pieces):
             piece = piece.strip()
@@ -156,6 +192,7 @@ def make_chunk_rows(
                     "text": piece,
                     "source_url": source_url,
                     "n_words": count_words(piece),
+                    "strategy": strategy,
                 }
             )
     return rows
