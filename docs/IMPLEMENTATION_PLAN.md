@@ -101,11 +101,12 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Lưu ý (chốt 2026-11-26)**: tác phẩm tải ảnh lỗi **vẫn giữ trong KB** với `image_path = null` — KHÔNG loại khỏi KB và KHÔNG rebuild với `--require-image`. Lý do: cột `image_path` nullable theo §2.3; nhánh BGE-M3 vẫn phục vụ câu hỏi metadata; nhánh CLIP chỉ trả tác phẩm có ảnh và §5.3 quy định "vắng ở nhánh nào thì nhận 0"; `abstain.py` R3 MISSING_FIELD từ chối câu hỏi VISUAL thiếu ảnh. Thêm `--retry-failed` để tải lại nhóm lỗi mà không tải lại toàn bộ. `build_kb` phải giữ `image_path` cũ nếu file ảnh còn tồn tại.
 - **Kết quả 2026-11-26 (verify độc lập bằng subagent)**: tải đủ **2.210/2.210 ảnh**, **0 lỗi**, tổng **110,6 MB**. Mọi file đều là JPEG/RGB với cạnh dài ≤ 512px; `artworks.parquet` có cột `image_path` khớp 1-1 với file trên đĩa. `uv run pytest -q` → **243 passed**.
 
-### [ ] T1.7 Đóng gói artefact
+### [x] T1.7 Đóng gói artefact (2026-11-26)
 - **Files**: `src/artrag/tools/artifacts.py`, `src/artrag/tools/__init__.py`, `tests/test_artifacts.py`.
 - **Nội dung**: `pack` (zip các thư mục kb, images, index, cache/captions*) và `unpack <zip>`; in kích thước; kèm `manifest.json` trong zip (parts/files/bytes/kb_hash) để `unpack` đối chiếu.
 - **Verify**: `uv run python -m artrag.tools.artifacts pack --only kb,images` → tạo zip; `unpack` vào thư mục tạm thì số file khớp.
 - **Sau task**: upload zip lên Google Drive và tạo Kaggle Dataset (thủ công, người dùng làm).
+- **Kết quả 2026-11-26 (verify độc lập bằng subagent)**: `pack --only kb,images` → **2.214 file** (kb 4 · images 2.210), dung lượng gốc 117,8 MB → zip 116,7 MB; `unpack` đối chiếu manifest → **khớp hoàn toàn**. `cache/` chỉ gom `cache/captions*` (đã kiểm chứng `cache/llm`, `cache/vqa` bị loại). `unpack --strict` trả exit code 1 với thông báo lỗi rõ ràng khi zip lệch manifest. `uv run pytest -q` → **263 passed**.
 
 ---
 
