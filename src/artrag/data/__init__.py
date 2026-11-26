@@ -1,1 +1,1 @@
-"""Xu ly du lieu offline: fetch CMA, parse, build KB, tai anh (SYSTEM_DESIGN 4)."""
+"""Xử lý dữ liệu offline: fetch CMA, parse, build KB, tải ảnh (SYSTEM_DESIGN 4)."""

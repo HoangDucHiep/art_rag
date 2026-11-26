@@ -1,20 +1,20 @@
-"""T1.4: lam giau tieu su hoa si tu Wikidata + Wikipedia (SYSTEM_DESIGN 2.1, 2.3).
+"""T1.4: làm giàu tiểu sử họa sĩ từ Wikidata + Wikipedia (SYSTEM_DESIGN 2.1, 2.3).
 
-Moi hoa si duy nhat trong KB (dedup theo ``artist_id``) duoc tra cuu:
+Mỗi họa sĩ duy nhất trong KB (dedup theo ``artist_id``) được tra cứu:
 
-1. ``wbsearchentities`` (Wikidata) -> danh sach candidate.
-2. ``wbgetentities`` -> xac nhan ``P31 == Q5`` (la nguoi) va doc
-   ``sitelinks.enwiki``; dung ``P569`` de phan biet cung ten.
-3. REST ``page/summary`` cua en.wikipedia.org -> ``extract`` (tom tat) + URL.
+1. ``wbsearchentities`` (Wikidata) -> danh sách candidate.
+2. ``wbgetentities`` -> xác nhận ``P31 == Q5`` (là người) và đọc
+   ``sitelinks.enwiki``; dùng ``P569`` để phân biệt cùng tên.
+3. REST ``page/summary`` của en.wikipedia.org -> ``extract`` (tóm tắt) + URL.
 
-Ket qua duoc cache tai ``raw/wiki/{artist_id}.json``; ca ``not_found`` va
-``error`` cung duoc cache nen chay lai khong goi lai mang. Wiki rat de
-tra HTTP 429, vi du rat limiter + retry/backoff la bat buoc.
+Kết quả được cache tại ``raw/wiki/{artist_id}.json``; cả ``not_found`` và
+``error`` cũng được cache nên chạy lại không gọi lại mạng. Wiki rất dễ
+trả HTTP 429, vì vậy rate limiter + retry/backoff là bắt buộc.
 
-Cac ham phan tich (``pick_candidate``, ``label_score``, ``entity_years`` ...)
-la ham thuan, test duoc ma khong can mang.
+Các hàm phân tích (``pick_candidate``, ``label_score``, ``entity_years`` ...)
+là hàm thuần, test được mà không cần mạng.
 
-Lenh:
+Lệnh:
     uv run python -m artrag.data.enrich_wiki --limit 30
     uv run python -m artrag.data.enrich_wiki
 """
@@ -46,17 +46,17 @@ STATUS_FOUND = "found"
 STATUS_NOT_FOUND = "not_found"
 STATUS_ERROR = "error"
 
-# nguoi tren Wikidata
+# người trên Wikidata
 Q_HUMAN = "Q5"
-# claim: ngay sinh
+# claim: ngày sinh
 P_BIRTH = "P569"
 # claim: instance of
 P_INSTANCE_OF = "P31"
 
-# nguong nhieu nhat cho nhan khi khop nam sinh (khop ten chat hon van duoc dung)
+# ngưỡng nhỏ nhất cho nhãn khi khớp năm sinh (khớp tên chặt hơn vẫn được dùng)
 BIRTH_MIN_LABEL_SCORE = 70.0
 
-# nghe nghiep nghe thuat tren Wikidata: chi nhan entity la hoa si moi dung.
+# nghề nghiệp nghệ thuật trên Wikidata: chỉ nhận entity là họa sĩ mới dùng.
 # Q1028181=painter, Q483501=artist, Q1281618=sculptor, Q11569986=printmaker,
 # Q329439=engraver, Q644687=illustrator, Q33231=photographer,
 # Q3303330=calligrapher, Q984276=court painter, Q1437754=xylographer,
@@ -94,7 +94,7 @@ ARTIST_OCCUPATIONS = [
     "Q1294787",  # artisan
 ]
 
-# tu khoa trong mo ta Wikidata cho biet entity co phai hoa si khong
+# từ khóa trong mô tả Wikidata cho biết entity có phải họa sĩ không
 ARTIST_DESC_KEYWORDS = (
     "painter",
     "artist",
@@ -108,8 +108,8 @@ ARTIST_DESC_KEYWORDS = (
     "printmaker",
     "murikari",
     "designer",
-    # cac nghe phai them vi chi ban SPARQL loc theo P106 nen mo ta van can
-    # de chan cac hoa si KHONG co enwiki (thi `p:P106` rong -> phai dung mo ta).
+    # các nghề phải thêm vì chỉ bản SPARQL lọc theo P106 nên mô tả vẫn cần
+    # để chặn các họa sĩ KHÔNG có enwiki (khi `p:P106` rỗng -> phải dùng mô tả).
     "draughtsman",
     "draftsman",
     "miniaturist",
@@ -143,7 +143,7 @@ ARTIST_DESC_KEYWORDS = (
 
 
 class HttpNotFound(Exception):
-    """Server tra 404 (trang/doi tuong khong ton tai)."""
+    """Server trả 404 (trang/đối tượng không tồn tại)."""
 
 
 # ---------------------------------------------------------------- helpers
@@ -153,10 +153,10 @@ def _cfg_get(cfg: Config, key: str, default: Any) -> Any:
 
 
 def normalize_name(name: Any) -> str:
-    """Chuan hoa ten de so sanh: bo dau, lowercase, gop khoang trang.
+    """Chuẩn hóa tên để so sánh: bỏ dấu, lowercase, gộp khoảng trắng.
 
-    Cac dau nhay phai dua ve mot dang de so sanh duoc giua ten trong KB va
-    ten bai enwiki: ``Kano Tan’yū`` (U+2019) vs. ``Kanō Tan'yū`` (U+0027).
+    Các dấu nháy phải đưa về một dạng để so sánh được giữa tên trong KB và
+    tên bài enwiki: ``Kano Tan’yū`` (U+2019) vs. ``Kanō Tan'yū`` (U+0027).
     """
     if name is None:
         return ""
@@ -169,24 +169,24 @@ def normalize_name(name: Any) -> str:
 
 
 def _tokens(name: Any) -> list[str]:
-    """Chia ten thanh token (chuan hoa da bo dau)."""
+    """Chia tên thành token (chuẩn hóa đã bỏ dấu)."""
     normalized = normalize_name(name)
     return normalized.split() if normalized else []
 
 
 def _merge_initials(left: list[str], right: list[str]) -> tuple[list[str], list[str]]:
-    """Gop chu cai dau voi token dai hon o phia doi dien.
+    """Gộp chữ cái đầu với token dài hơn ở phía đối diện.
 
-    ``Joseph Mallord William Turner`` vs ``J. M. W. Turner``: cac chu cai
-    dau ``J/M/W`` duoc gop vao ``Joseph/Mallord/William`` de hai ben co cung
-    tap token.
+    ``Joseph Mallord William Turner`` vs ``J. M. W. Turner``: các chữ cái
+    đầu ``J/M/W`` được gộp vào ``Joseph/Mallord/William`` để hai bên có cùng
+    tập token.
     """
     left_merged = list(left)
     right_merged = list(right)
 
     def _apply(shorter: list[str], longer: list[str]) -> None:
         for index, token in enumerate(list(shorter)):
-            # token "j." la chu cai dau co dau cham cuoi
+            # token "j." là chữ cái đầu có dấu chấm cuối
             if len(token.rstrip(".")) != 1:
                 continue
             initial = token.rstrip(".")[0]
@@ -202,11 +202,11 @@ def _merge_initials(left: list[str], right: list[str]) -> tuple[list[str], list[
 
 
 def _has_prefix_conflict(left: list[str], right: list[str]) -> bool:
-    """Co token nao cua hai ben la tien to cua token kia khong?
+    """Có token nào của hai bên là tiền tố của token kia không?
 
-    ``Wang Yuan`` va ``Wang Yuanqi`` la hai hoa si khac nhau nhung lai la
-    tien to cua nhau theo chuoi -> ``fuzz.ratio`` cho 90 diem (do do dai
-    giong nhau) du chung la hai nguoi khac.
+    ``Wang Yuan`` và ``Wang Yuanqi`` là hai họa sĩ khác nhau nhưng lại là
+    tiền tố của nhau theo chuỗi -> ``fuzz.ratio`` cho 90 điểm (do độ dài
+    giống nhau) dù chúng là hai người khác.
     """
     for a in left:
         for b in right:
@@ -218,19 +218,19 @@ def _has_prefix_conflict(left: list[str], right: list[str]) -> bool:
 
 
 def label_score(name: Any, label: Any) -> float:
-    """Do giong ten (0..100) giua ten trong KB va label cua Wikidata.
+    """Độ giống tên (0..100) giữa tên trong KB và label của Wikidata.
 
-    ``rapidfuzz.token_set_ratio`` **khong** phu hop o day: no so sanh tap
-    token con lai nen hai ten khong lien quan van duoc diem cao. Vi du
-    ``Zhou Chen`` (Ming, sinh 1460) vs ``Shen Zhou`` (sinh 1427) deu chung
-    token ``zhou`` -> ``token_set_ratio`` = 88.9, du de qua nguong 88 va
-    khong loai duoc hoa si sai.
+    ``rapidfuzz.token_set_ratio`` **không** phù hợp ở đây: nó so sánh tập
+    token còn lại nên hai tên không liên quan vẫn được điểm cao. Ví dụ
+    ``Zhou Chen`` (Ming, sinh 1460) vs ``Shen Zhou`` (sinh 1427) đều chung
+    token ``zhou`` -> ``token_set_ratio`` = 88.9, đủ để qua ngưỡng 88 và
+    không loại được họa sĩ sai.
 
-    Vì vay dung **kiem tra chua** truoc: hai ten chi duoc coi la cung mot
-    nguoi khi mot tap token chua tap token con lai (sau khi gop chu cai dau).
-    ``Agnolo Bronzino`` chua ``Bronzino`` -> hop le; ``Joseph Mallord William
-    Turner`` chua ``J. M. W. Turner`` (sau khi gop) -> hop le; ``Zhou Chen``
-    khong chua ``Shen Zhou`` -> khong phai cung nguoi, diem thap.
+    Vì vậy dùng **kiểm tra chứa** trước: hai tên chỉ được coi là cùng một
+    người khi một tập token chứa tập token còn lại (sau khi gộp chữ cái đầu).
+    ``Agnolo Bronzino`` chứa ``Bronzino`` -> hợp lệ; ``Joseph Mallord William
+    Turner`` chứa ``J. M. W. Turner`` (sau khi gộp) -> hợp lệ; ``Zhou Chen``
+    không chứa ``Shen Zhou`` -> không phải cùng người, điểm thấp.
     """
     left = _tokens(name)
     right = _tokens(label)
@@ -239,26 +239,26 @@ def label_score(name: Any, label: Any) -> float:
     left_merged, right_merged = _merge_initials(left, right)
     left_set = set(left_merged)
     right_set = set(right_merged)
-    # phai la chua **nguyen token**, khong phai chua tien to: `Wang Yuan` khong
-    # phai la `Wang Yuanqi` (hoa si khac).
+    # phải là chứa **nguyên token**, không phải chứa tiền tố: `Wang Yuan` không
+    # phải là `Wang Yuanqi` (họa sĩ khác).
     contained = left_set.issubset(right_set) or right_set.issubset(left_set)
     if contained:
         return float(
             fuzz.token_set_ratio(" ".join(left_merged), " ".join(right_merged))
         )
     if _has_prefix_conflict(left_merged, right_merged):
-        # tien to cua nhau -> hai nguoi khac, du chuoi rat giong nhau.
+        # tiền tố của nhau -> hai người khác, dù chuỗi rất giống nhau.
         return 0.0
-    # hai tap token khong chua nhau -> khac nguoi -> dung do giong ky tu.
+    # hai tập token không chứa nhau -> khác người -> dùng độ giống ký tự.
     return float(fuzz.ratio(" ".join(left), " ".join(right)))
 
 
 def year_from_time(value: Any) -> int | None:
-    """Chuoi thoi gian Wikidata/SPARQL -> nam.
+    """Chuỗi thời gian Wikidata/SPARQL -> năm.
 
-    Hai dinh dang xuat hien:
-    - Wikidata entity API: ``+1844-07-25T00:00:00Z`` (co dau ``+``)
-    - SPARQL endpoint:    ``1844-07-25T00:00:00Z``  (khong co dau ``+``)
+    Hai định dạng xuất hiện:
+    - Wikidata entity API: ``+1844-07-25T00:00:00Z`` (có dấu ``+``)
+    - SPARQL endpoint:    ``1844-07-25T00:00:00Z``  (không có dấu ``+``)
     """
     if not isinstance(value, str) or len(value) < 4:
         return None
@@ -273,7 +273,7 @@ def year_from_time(value: Any) -> int | None:
 
 
 def _claim_values(entity: Any, prop: str) -> list[Any]:
-    """Gia tri cua mot claim (bo qua snak khong co datavalue)."""
+    """Giá trị của một claim (bỏ qua snak không có datavalue)."""
     if not isinstance(entity, dict):
         return []
     claims = entity.get("claims")
@@ -300,7 +300,7 @@ def _claim_values(entity: Any, prop: str) -> list[Any]:
 
 
 def entity_years(entity: Any) -> list[int]:
-    """Cac nam sinh (``P569``) cua entity."""
+    """Các năm sinh (``P569``) của entity."""
     years: list[int] = []
     for value in _claim_values(entity, P_BIRTH):
         if isinstance(value, dict):
@@ -311,7 +311,7 @@ def entity_years(entity: Any) -> list[int]:
 
 
 def is_human(entity: Any) -> bool:
-    """Entity co ``P31`` chua ``Q5`` (con nguoi) hay khong."""
+    """Entity có ``P31`` chứa ``Q5`` (con người) hay không."""
     for value in _claim_values(entity, P_INSTANCE_OF):
         if isinstance(value, dict) and value.get("id") == Q_HUMAN:
             return True
@@ -319,7 +319,7 @@ def is_human(entity: Any) -> bool:
 
 
 def entity_label(entity: Any) -> str | None:
-    """Nhan tieng Anh cua entity (``labels.en.value``)."""
+    """Nhãn tiếng Anh của entity (``labels.en.value``)."""
     if not isinstance(entity, dict):
         return None
     labels = entity.get("labels")
@@ -333,7 +333,7 @@ def entity_label(entity: Any) -> str | None:
 
 
 def entity_sitelink(entity: Any, site: str = "enwiki") -> str | None:
-    """Ten bai wiki tuong ung (``sitelinks.enwiki.title``)."""
+    """Tên bài wiki tương ứng (``sitelinks.enwiki.title``)."""
     if not isinstance(entity, dict):
         return None
     sitelinks = entity.get("sitelinks")
@@ -348,7 +348,7 @@ def entity_sitelink(entity: Any, site: str = "enwiki") -> str | None:
 
 # ---------------------------------------------------------------- matching
 def candidate_years(candidate: Any) -> list[int]:
-    """Cac nam nam trong ``description`` cua search result, vi du ``"(c. 1775-1851)"``."""
+    """Các năm nằm trong ``description`` của search result, ví dụ ``"(c. 1775-1851)"``."""
     if not isinstance(candidate, dict):
         return []
     description = candidate.get("description")
@@ -363,12 +363,12 @@ def candidate_years(candidate: Any) -> list[int]:
 
 
 def candidate_name_variants(candidate: Any, entity: Any = None) -> list[str]:
-    """Cac bien the ten cua candidate: label, ``match.text``, aliases.
+    """Các biến thể tên của candidate: label, ``match.text``, aliases.
 
-    Wikidata luu nhieu hoa si voi nhan canonical rut gon (vi du ``J. M. W.
-    Turner`` trong khi CMA goi ``Joseph Mallord William Turner``). ``wbsearchentities``
-    tra ve ``match.text`` va ``aliases`` la cac bien the do, nen phai cham diem
-    moi bien the chu khong chi label.
+    Wikidata lưu nhiều họa sĩ với nhãn canonical rút gọn (ví dụ ``J. M. W.
+    Turner`` trong khi CMA gọi ``Joseph Mallord William Turner``). ``wbsearchentities``
+    trả về ``match.text`` và ``aliases`` là các biến thể đó, nên phải chấm điểm
+    mọi biến thể chứ không chỉ label.
     """
     variants: list[str] = []
     if isinstance(candidate, dict):
@@ -394,7 +394,7 @@ def candidate_name_variants(candidate: Any, entity: Any = None) -> list[str]:
                 for item in en:
                     if isinstance(item, dict) and isinstance(item.get("value"), str):
                         variants.append(item["value"])
-    # bo trung, giu thu tu
+    # bỏ trùng, giữ thứ tự
     seen: set[str] = set()
     unique: list[str] = []
     for value in variants:
@@ -413,10 +413,10 @@ def pick_candidate(
     label_threshold: float = 88.0,
     birth_tolerance: int = 3,
 ) -> dict[str, Any] | None:
-    """Chon candidate khop nhat cho mot hoa si.
+    """Chọn candidate khớp nhất cho một họa sĩ.
 
-    Uu tien: (1) co ``P31=Q5``, (2) co sitelink ``enwiki``, (3) khop ten,
-    (4) khop nam sinh. Tra ``None`` neu khong co candidate nao dat yeu cau.
+    Ưu tiên: (1) có ``P31=Q5``, (2) có sitelink ``enwiki``, (3) khớp tên,
+    (4) khớp năm sinh. Trả ``None`` nếu không có candidate nào đạt yêu cầu.
     """
     if not candidates:
         return None
@@ -479,17 +479,17 @@ def pick_candidate(
 
 
 # ---------------------------------------------------------------- batch mode
-# Chi ti gia: de do lai bang lenh nay (2026-11-25):
-#   26 request wbsearchentities lien tiep -> 16 loi 429, phai doi 45-52 giay.
-#   => che do tung artist khong kha thi cho 762 artist (~2.300 request).
-#   Che do batch: 25 ten/req SPARQL ~5s, 30 title/req Wikipedia ~5s
-#   => ~57 request cho toan bo 762 artist.
+# Ghi chú: đã đo lại bằng lệnh này (2026-11-25):
+#   26 request wbsearchentities liên tiếp -> 16 lỗi 429, phải đợi 45-52 giây.
+#   => chế độ từng artist không khả thi cho 762 artist (~2.300 request).
+#   Chế độ batch: 25 tên/req SPARQL ~5s, 30 title/req Wikipedia ~5s
+#   => ~57 request cho toàn bộ 762 artist.
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 
 
 def sparql_escape(value: str) -> str:
-    """Escape chuoi de nhung vao literal SPARQL."""
+    """Escape chuỗi để nhúng vào literal SPARQL."""
     return (
         str(value)
         .replace("\\", "\\\\")
@@ -500,26 +500,26 @@ def sparql_escape(value: str) -> str:
 
 
 def build_sparql_query(terms: list[str] | list[tuple[str, str]]) -> str:
-    """Cau SPARQL tra QID + nam sinh + URL bai enwiki cho mot nhom ten.
+    """Câu SPARQL trả QID + năm sinh + URL bài enwiki cho một nhóm tên.
 
-    ``terms`` la danh sach ten, hoac danh sach ``(ten, ngon_ngu)``. Khi co
-    ngon ngu thi literal duoc gan nhan tuong ung — **bat buoc**, vi nhan
-    Wikidata cua hoa si Nhat/Trung thuong khong co o ``en`` (vi du
-    ``Tsukioka Settei`` chi co nhan ``ja``/``mul``, ``Lin Liang`` chi co
-    ``zh``/``fr``/``ru``). Neu ep ``@en`` thi hoa si do bi bo qua hoan toan.
+    ``terms`` là danh sách tên, hoặc danh sách ``(tên, ngôn_ngữ)``. Khi có
+    ngôn ngữ thì literal được gắn nhãn tương ứng — **bắt buộc**, vì nhãn
+    Wikidata của họa sĩ Nhật/Trung thường không có ở ``en`` (ví dụ
+    ``Tsukioka Settei`` chỉ có nhãn ``ja``/``mul``, ``Lin Liang`` chỉ có
+    ``zh``/``fr``/``ru``). Nếu ép ``@en`` thì họa sĩ đó bị bỏ qua hoàn toàn.
 
-    Loc them nghe nghiep nghe thuat (``wdt:P106`` trong
-    ``ARTIST_OCCUPATIONS``) de loai bo nguoi cung ten nhung khac nghe
-    (vi du ``Wang Yuan`` hoa si vs. `Wang Yuan (mathematician)`).
+    Lọc thêm nghề nghiệp nghệ thuật (``wdt:P106`` trong
+    ``ARTIST_OCCUPATIONS``) để loại bỏ người cùng tên nhưng khác nghề
+    (ví dụ ``Wang Yuan`` họa sĩ vs. `Wang Yuan (mathematician)`).
 
-    ``?canon`` la **nhan tieng Anh chuan** (``rdfs:label`` voi ``LANG="en"``).
-    Can phai lay no rieng biet vi ``?name`` chi la nhan/alias khớp duoc: hoa si
-    ``Zhou Chen`` (Ming) co alias ``Zhou Chen`` tren entity ``Shen Zhou`` — mot
-    hoa si khac — nen diem so sanh phai dua tren nhan chuan de loai nham.
+    ``?canon`` là **nhãn tiếng Anh chuẩn** (``rdfs:label`` với ``LANG="en"``).
+    Cần phải lấy nó riêng biệt vì ``?name`` chỉ là nhãn/alias khớp được: họa sĩ
+    ``Zhou Chen`` (Ming) có alias ``Zhou Chen`` trên entity ``Shen Zhou`` — một
+    họa sĩ khác — nên điểm so sánh phải dựa trên nhãn chuẩn để loại nhầm.
 
-    ``p:P569/ps:P569`` lay **tat ca** gia tri nam sinh (khong chi rank
-    ``preferred`` nhu ``wdt:P569``), vi nhieu hoa si co nhieu nam sinh ghi
-    o cac rank khac nhau (vi du ``Tsukioka Settei``: 1710 va 1726).
+    ``p:P569/ps:P569`` lấy **tất cả** giá trị năm sinh (không chỉ rank
+    ``preferred`` như ``wdt:P569``), vì nhiều họa sĩ có nhiều năm sinh ghi
+    ở các rank khác nhau (ví dụ ``Tsukioka Settei``: 1710 và 1726).
     """
     values = " ".join(
         f'"{sparql_escape(name)}"@{lang}'
@@ -541,7 +541,7 @@ def build_sparql_query(terms: list[str] | list[tuple[str, str]]) -> str:
 
 
 def _is_term_pairs(terms: Any) -> bool:
-    """Danh sach co phai la cac cap ``(ten, ngon_ngu)`` khong?"""
+    """Danh sách có phải là các cặp ``(tên, ngôn_ngữ)`` không?"""
     if not terms:
         return False
     first = terms[0]
@@ -549,7 +549,7 @@ def _is_term_pairs(terms: Any) -> bool:
 
 
 def parse_sparql_rows(payload: Any) -> list[dict[str, Any]]:
-    """Chuyen JSON SPARQL thanh list dict thuoc tinh don gian."""
+    """Chuyển JSON SPARQL thành list dict thuộc tính đơn giản."""
     if not isinstance(payload, dict):
         return []
     results = payload.get("results")
@@ -584,8 +584,8 @@ def qid_from_uri(uri: Any) -> str | None:
 def title_from_article_url(url: Any) -> str | None:
     """``https://en.wikipedia.org/wiki/Thomas_Eakins`` -> ``Thomas Eakins``.
 
-    Phai giai ma phan trong (URL percent-encode): ``Ogata K%C5%8Drin`` ->
-    ``Ogata Kōrin``, neu khong se khong khop duoc voi tieu de bai that.
+    Phải giải mã phần trăm (URL percent-encode): ``Ogata K%C5%8Drin`` ->
+    ``Ogata Kōrin``, nếu không sẽ không khớp được với tiêu đề bài thật.
     """
     if not isinstance(url, str):
         return None
@@ -599,11 +599,11 @@ def title_from_article_url(url: Any) -> str | None:
 
 
 def build_extract_query(titles: list[str]) -> dict[str, Any]:
-    """Tham so cho API Wikipedia lay tom tat nhieu bai mot luc.
+    """Tham số cho API Wikipedia lấy tóm tắt nhiều bài một lúc.
 
-    ``pageprops`` cho ``wikibase_item`` (QID cua bai) — duoc dung lam duong
-    giai khi ten tren Wikidata khac ten tren enwiki (vi du hoa si Trung
-    Quoc: nhan Wikidata la tieng Trong `趙孟頫`, con bai enwiki la
+    ``pageprops`` cho ``wikibase_item`` (QID của bài) — được dùng làm đường
+    dự phòng khi tên trên Wikidata khác tên trên enwiki (ví dụ họa sĩ Trung
+    Quốc: nhãn Wikidata là tiếng Trung `趙孟頫`, còn bài enwiki là
     `Zhao Mengfu`).
     """
     return {
@@ -611,13 +611,13 @@ def build_extract_query(titles: list[str]) -> dict[str, Any]:
         "prop": "extracts|info|pageprops",
         "exintro": 1,
         "explaintext": 1,
-        # `exlimit` toi da 20 voi user an danh; neu vuot, API chi tra extract
-        # cho 20 trang dau va cac trang sau bi thieu summary.
+        # `exlimit` tối đa 20 với user ẩn danh; nếu vượt, API chỉ trả extract
+        # cho 20 trang đầu và các trang sau bị thiếu summary.
         "exlimit": 20,
         "redirects": 1,
         "inprop": "url",
-        # `disambiguation` cho biet chinh xac trang nao la trang "dinh nghia"
-        # — tin hieu chinh thuc cua Wikipedia, thay cho su doan van ban.
+        # `disambiguation` cho biết chính xác trang nào là trang "định hướng"
+        # — tín hiệu chính thức của Wikipedia, thay cho suy đoán văn bản.
         "ppprop": "wikibase_item|disambiguation",
         "titles": "|".join(titles),
         "format": "json",
@@ -626,7 +626,7 @@ def build_extract_query(titles: list[str]) -> dict[str, Any]:
 
 
 def parse_extract_pages(payload: Any) -> dict[str, dict[str, Any]]:
-    """Chuyen JSON Wikipedia thanh map ``title -> {extract, fullurl, qid}``."""
+    """Chuyển JSON Wikipedia thành map ``title -> {extract, fullurl, qid}``."""
     result: dict[str, dict[str, Any]] = {}
     if not isinstance(payload, dict):
         return result
@@ -636,7 +636,7 @@ def parse_extract_pages(payload: Any) -> dict[str, dict[str, Any]]:
     pages = query.get("pages")
     if not isinstance(pages, list):
         return result
-    # ban gia ten -> ten chuan (vi du "Katsushika Hokusai" -> "Hokusai")
+    # bảng ánh xạ tên -> tên chuẩn (ví dụ "Katsushika Hokusai" -> "Hokusai")
     aliases: dict[str, str] = {}
     for key in ("redirects", "normalized"):
         entries = query.get(key)
@@ -663,7 +663,7 @@ def parse_extract_pages(payload: Any) -> dict[str, dict[str, Any]]:
             raw_qid = pageprops.get("wikibase_item")
             if isinstance(raw_qid, str) and raw_qid.startswith("Q"):
                 qid = raw_qid
-            # Wikipedia gan `disambiguation` (gia tri rong) cho trang dinh nghia.
+            # Wikipedia gắn `disambiguation` (giá trị rỗng) cho trang định hướng.
             is_disambiguation = "disambiguation" in pageprops
         entry = {
             "extract": strip_html(extract) if isinstance(extract, str) and extract else None,
@@ -672,7 +672,7 @@ def parse_extract_pages(payload: Any) -> dict[str, dict[str, Any]]:
             "is_disambiguation": is_disambiguation,
         }
         result[title] = entry
-        # gan them key cho ten da bi chuyen huong
+        # gán thêm key cho tên đã bị chuyển hướng
         for source, target in aliases.items():
             if target == title:
                 result[source] = entry
@@ -680,7 +680,7 @@ def parse_extract_pages(payload: Any) -> dict[str, dict[str, Any]]:
 
 
 def build_search_query(term: str) -> dict[str, Any]:
-    """Tham so cho API Wikipedia tim bai theo ten (khi khong co sitelink)."""
+    """Tham số cho API Wikipedia tìm bài theo tên (khi không có sitelink)."""
     return {
         "action": "query",
         "list": "search",
@@ -702,11 +702,11 @@ def fetch_enwiki_search_titles(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, str]:
-    """Tra ``{ten_goc: ten_bai_enwiki}`` cho cac ten co bai tren enwiki.
+    """Trả ``{tên_gốc: tên_bài_enwiki}`` cho các tên có bài trên enwiki.
 
-    Dung cho hoa si **khong co enwiki sitelink tren Wikidata** (vi du hoa si
-    Nhat chi duoc ghi o bai Nhat): ten bai enwiki van ton tai va tim duoc
-    bang full-text search, nhung SPARQL ``schema:isPartOf`` thi khong tra ve.
+    Dùng cho họa sĩ **không có enwiki sitelink trên Wikidata** (ví dụ họa sĩ
+    Nhật chỉ được ghi ở bài Nhật): tên bài enwiki vẫn tồn tại và tìm được
+    bằng full-text search, nhưng SPARQL ``schema:isPartOf`` thì không trả về.
     """
     result: dict[str, str] = {}
     if not terms:
@@ -752,10 +752,10 @@ def fetch_enwiki_by_titles(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Tra cuu bai enwiki theo **ten bai** (khong phai theo nhan Wikidata).
+    """Tra cứu bài enwiki theo **tên bài** (không phải theo nhãn Wikidata).
 
-    Dung khi SPARQL theo nhan khong ra ket qua: nhieu hoa si Trung Quoc/Nhat
-    co nhan Wikidata o chu Han, nhung van co bai tieng Anh tren enwiki.
+    Dùng khi SPARQL theo nhãn không ra kết quả: nhiều họa sĩ Trung Quốc/Nhật
+    có nhãn Wikidata ở chữ Hán, nhưng vẫn có bài tiếng Anh trên enwiki.
     """
     if not titles:
         return {}
@@ -784,10 +784,10 @@ def resolve_names_batch(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Giai nhieu ten hoa si bang 1 request SPARQL.
+    """Giải nhiều tên họa sĩ bằng 1 request SPARQL.
 
-    ``names`` la danh sach ten, hoac danh sach ``(ten, ngon_ngu)``.
-    Tra ``{ten: [candidate, ...]}``; moi candidate co ``qid``, ``wiki_title``,
+    ``names`` là danh sách tên, hoặc danh sách ``(tên, ngôn_ngữ)``.
+    Trả ``{tên: [candidate, ...]}``; mỗi candidate có ``qid``, ``wiki_title``,
     ``wiki_url``, ``birth_year``, ``label``, ``canonical_label``.
     """
     if not names:
@@ -826,9 +826,9 @@ def resolve_names_batch(
                 "wiki_title": title,
                 "wiki_url": url,
                 "birth_year": year,
-                # `canon` = nhan tieng Anh chuan cua entity. KHONG dung `name`
-                # (gia tri da khop) lam `label`, vi khi do moi candidate deu
-                # goc diem 100 va khong phan biet duoc hoa si nao dung nhat.
+                # `canon` = nhãn tiếng Anh chuẩn của entity. KHÔNG dùng `name`
+                # (giá trị đã khớp) làm `label`, vì khi đó mọi candidate đều
+                # đạt điểm 100 và không phân biệt được họa sĩ nào đúng nhất.
                 "label": canon or name,
                 "canonical_label": canon,
                 "matched_name": name,
@@ -848,7 +848,7 @@ def fetch_extracts_batch(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Lay tom tat nhieu bai wikipedia bang 1 request (``action=query``)."""
+    """Lấy tóm tắt nhiều bài wikipedia bằng 1 request (``action=query``)."""
     if not titles:
         return {}
     headers = {"User-Agent": user_agent} if user_agent else None
@@ -867,14 +867,14 @@ def fetch_extracts_batch(
 
 
 def build_occupation_query(qids: list[str]) -> str:
-    """Cau SPARQL lay mo ta + nghe + nam sinh cua nhieu QID.
+    """Câu SPARQL lấy mô tả + nghề + năm sinh của nhiều QID.
 
-    Dung de kiem tra duong dan du phong (xem ``is_artist_qid``).
+    Dùng để kiểm tra đường dẫn dự phòng (xem ``is_artist_qid``).
 
-    ``p:P569/ps:P569`` lay **tat ca** cac gia tri nam sinh (ke ca rank
-    ``normal``/``deprecated``), con ``wdt:P569`` chi lay gia tri ``preferred``.
-    Vi du ``Tsukioka Settei`` co nam sinh 1710 (normal) va 1726 (preferred);
-    chi lay ``wdt:P569`` se bo qua 1710 va loai oai hoa si khi KB ghi 1710.
+    ``p:P569/ps:P569`` lấy **tất cả** các giá trị năm sinh (kể cả rank
+    ``normal``/``deprecated``), còn ``wdt:P569`` chỉ lấy giá trị ``preferred``.
+    Ví dụ ``Tsukioka Settei`` có năm sinh 1710 (normal) và 1726 (preferred);
+    chỉ lấy ``wdt:P569`` sẽ bỏ qua 1710 và loại oan họa sĩ khi KB ghi 1710.
     """
     values = " ".join(f"wd:{sparql_escape(qid)}" for qid in qids)
     return (
@@ -897,7 +897,7 @@ def fetch_occupations_batch(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Tra ``{qid: {"descriptions": [...], "occupations": [Q-id, ...]}}``."""
+    """Trả ``{qid: {"descriptions": [...], "occupations": [Q-id, ...]}}``."""
     if not qids:
         return {}
     headers = {"Accept": "application/sparql-results+json"}
@@ -937,7 +937,7 @@ def fetch_occupations_batch(
 
 
 def first_birth_year(qid_info: dict[str, Any] | None) -> int | None:
-    """Nam sinh dau tien cua entity (gia tri ``None`` neu khong biet)."""
+    """Năm sinh đầu tiên của entity (giá trị ``None`` nếu không biết)."""
     if not qid_info:
         return None
     years = qid_info.get("years") or []
@@ -945,9 +945,9 @@ def first_birth_year(qid_info: dict[str, Any] | None) -> int | None:
 
 
 def is_artist_qid(qid_info: dict[str, Any] | None) -> bool:
-    """Entity co phai hoa si khong, theo nghe (P106) va mo ta.
+    """Entity có phải họa sĩ không, theo nghề (P106) và mô tả.
 
-    ``None`` (khong co du lieu) -> khong loai, vi day chi la lop bao ve thu hai.
+    ``None`` (không có dữ liệu) -> không loại, vì đây chỉ là lớp bảo vệ thứ hai.
     """
     if not qid_info:
         return True
@@ -967,10 +967,10 @@ def birth_year_agrees(
     birth_year: int | None,
     tolerance: int = 3,
 ) -> bool:
-    """Nam sinh tren Wikidata co khop nam sinh trong KB khong?
+    """Năm sinh trên Wikidata có khớp năm sinh trong KB không?
 
-    Neu KB co nam sinh va Wikidata cung co, thi sai so phai <= ``tolerance``.
-    Neu mot trong hai khong co -> khong co bang chung phu dinh -> chap nhan.
+    Nếu KB có năm sinh và Wikidata cũng có, thì sai số phải <= ``tolerance``.
+    Nếu một trong hai không có -> không có bằng chứng phủ định -> chấp nhận.
     """
     if not qid_info or birth_year is None:
         return True
@@ -981,19 +981,19 @@ def birth_year_agrees(
 
 
 def looks_like_disambiguation(extract: Any, is_disambiguation: bool = False) -> bool:
-    """Trang wikipedia co phai trang "dinh nghia" (nhieu nguoi cung ten) khong.
+    """Trang wikipedia có phải trang "định hướng" (nhiều người cùng tên) không.
 
-    Vi du ``Hashim``, ``Tao Hong``, ``Le Nain``: la trang liet ke nhieu nguoi
-    khac nhau, khong phai bai viet ve mot hoa si -> khong dung lam nguon.
+    Ví dụ ``Hashim``, ``Tao Hong``, ``Le Nain``: là trang liệt kê nhiều người
+    khác nhau, không phải bài viết về một họa sĩ -> không dùng làm nguồn.
 
-    ``is_disambiguation`` la co ``pageprops.disambiguation`` cua Wikipedia —
-    tin hieu chinh thuc, dung hon su doan van ban. Khi khong co tin hieu nay
-    thi moi quay ve heuristic.
+    ``is_disambiguation`` là cờ ``pageprops.disambiguation`` của Wikipedia —
+    tín hiệu chính thức, đúng hơn suy đoán văn bản. Khi không có tín hiệu này
+    thì mới quay về heuristic.
 
-    Heuristic chi kiem **cau dau tien** cua bai: bai ve hoa si ``Bronzino``
-    co cau "His sobriquet, Bronzino, **may refer to** his relatively dark
-    skin" — neu tim chuoi bat ky ai thi bai hop le bi loai nham. Con trang
-    dinh nghia thi luon bat dau bang cau giai thich ("X may refer to:", ...).
+    Heuristic chỉ kiểm **câu đầu tiên** của bài: bài về họa sĩ ``Bronzino``
+    có câu "His sobriquet, Bronzino, **may refer to** his relatively dark
+    skin" — nếu tìm chuỗi bất kỳ ở đâu thì bài hợp lệ bị loại nhầm. Còn trang
+    định hướng thì luôn bắt đầu bằng câu giải thích ("X may refer to:", ...).
     """
     if is_disambiguation:
         return True
@@ -1015,24 +1015,24 @@ def looks_like_disambiguation(extract: Any, is_disambiguation: bool = False) -> 
     return any(marker in head for marker in markers)
 
 
-# dau cau ket thuc cua mot cau (bo qua dau cham trong "J. M. W. Turner").
+# dấu câu kết thúc của một câu (bỏ qua dấu chấm trong "J. M. W. Turner").
 _SENTENCE_END_RE = re.compile(r"[.!?]\s+(?=[A-Z\"'(\u201c])")
 
 
 def _first_sentence(text: str) -> str:
-    """Phan dau tien cua van ban (den het cau dau)."""
+    """Phần đầu tiên của văn bản (đến hết câu đầu)."""
     match = _SENTENCE_END_RE.search(text)
     return text[: match.start()] if match else text
 
 
 def is_artist_description(description: Any) -> bool:
-    """Mo ta Wikidata co phai noi ve hoa si khong.
+    """Mô tả Wikidata có phải nói về họa sĩ không.
 
-    Dung de loai bo false positive khi trung ten: ``Wang Yuan`` hoa si
+    Dùng để loại bỏ false positive khi trùng tên: ``Wang Yuan`` họa sĩ
     (Q2889034, "Chinese painter") vs. `Wang Yuan (mathematician)`.
     """
     if not isinstance(description, str) or not description:
-        return True  # khong co mo ta -> khong loai
+        return True  # không có mô tả -> không loại
     lowered = description.lower()
     return any(keyword in lowered for keyword in ARTIST_DESC_KEYWORDS)
 
@@ -1044,20 +1044,20 @@ def pick_batch_candidate(
     label_threshold: float = 88.0,
     birth_tolerance: int = 3,
 ) -> dict[str, Any] | None:
-    """Chon candidate tot nhat trong ket qua SPARQL (da co QID + bai wiki).
+    """Chọn candidate tốt nhất trong kết quả SPARQL (đã có QID + bài wiki).
 
-    Uu tien: (1) entity la hoa si (theo nghe hoac mo ta), (2) khop nam sinh,
-    (3) khop ten.
+    Ưu tiên: (1) entity là họa sĩ (theo nghề hoặc mô tả), (2) khớp năm sinh,
+    (3) khớp tên.
 
-    Diem so sanh dung **nhan chuan** (``canonical_label``) cua entity, khong
-    dung gia tri ``name`` da khop. Neu dung ``name`` thi moi candidate deu
-    goc diem 100, nen khong phan biet duoc hoa si nao that su dung: vi du
-    ``Zhou Chen`` (Ming, sinh 1460) bi match nham sang ``Shen Zhou`` (sinh
-    1427) vi ``Shen Zhou`` co alias ``Zhou Chen``.
+    Điểm so sánh dùng **nhãn chuẩn** (``canonical_label``) của entity, không
+    dùng giá trị ``name`` đã khớp. Nếu dùng ``name`` thì mọi candidate đều
+    đạt điểm 100, nên không phân biệt được họa sĩ nào thật sự đúng: ví dụ
+    ``Zhou Chen`` (Ming, sinh 1460) bị match nhầm sang ``Shen Zhou`` (sinh
+    1427) vì ``Shen Zhou`` có alias ``Zhou Chen``.
 
-    Ngoai ra, candidate phai **khac nghe** voi entity da bi loai truoc do: neu
-    KB quy cho ``Zhou Chen`` nam sinh 1445 ma entity la 1427 thi do lech
-    18 nam -> dung nguoi khac, phai loai.
+    Ngoài ra, candidate phải **khác nghề** với entity đã bị loại trước đó: nếu
+    KB ghi cho ``Zhou Chen`` năm sinh 1445 mà entity là 1427 thì độ lệch
+    18 năm -> đúng người khác, phải loại.
     """
     best: dict[str, Any] | None = None
     best_key: tuple[int, int, float] = (0, 0, 0.0)
@@ -1083,7 +1083,7 @@ def pick_batch_candidate(
             qualifies = True
         if not qualifies:
             continue
-        # hoa si + khop nam sinh + khop ten
+        # họa sĩ + khớp năm sinh + khớp tên
         key = (1 if birth_matched else 0, 1, score)
         if best is None or key > best_key:
             best_key = key
@@ -1104,12 +1104,12 @@ def pick_batch_candidate(
 
 # ---------------------------------------------------------------- cache
 def wiki_cache_path(raw_dir: str | Path, artist_id: str) -> Path:
-    """Duong dan file cache cua mot hoa si (``raw/wiki/{artist_id}.json``)."""
+    """Đường dẫn file cache của một họa sĩ (``raw/wiki/{artist_id}.json``)."""
     return Path(raw_dir) / "wiki" / f"{artist_id}.json"
 
 
 def is_cache_valid(payload: Any, artist_id: str) -> bool:
-    """Cache hop le khi ``artist_id`` khop va ``status`` nam trong tap hop hop le."""
+    """Cache hợp lệ khi ``artist_id`` khớp và ``status`` nằm trong tập hợp hợp lệ."""
     if not isinstance(payload, dict):
         return False
     if payload.get("artist_id") != artist_id:
@@ -1118,7 +1118,7 @@ def is_cache_valid(payload: Any, artist_id: str) -> bool:
 
 
 def read_cache(path: str | Path) -> Any:
-    """Doc file cache; tra None neu khong ton tai hoac hong."""
+    """Đọc file cache; trả None nếu không tồn tại hoặc hỏng."""
     p = Path(path)
     if not p.exists():
         return None
@@ -1141,7 +1141,7 @@ def build_record(
     birth_matched: bool = False,
     cma_bio: str | None = None,
 ) -> dict[str, Any]:
-    """Tao payload cache cho mot hoa si."""
+    """Tạo payload cache cho một họa sĩ."""
     return {
         "artist_id": artist.get("artist_id"),
         "name": artist.get("artist_name"),
@@ -1161,7 +1161,7 @@ def build_record(
 
 # ---------------------------------------------------------------- inputs
 def load_artists(cfg: Config) -> list[dict[str, Any]]:
-    """Doc KB, lay cac hoa si duy nhat (dedup theo ``artist_id``)."""
+    """Đọc KB, lấy các họa sĩ duy nhất (dedup theo ``artist_id``)."""
     p = paths(cfg)
     kb_path = p.kb / "artworks.parquet"
     if not kb_path.exists():
@@ -1194,7 +1194,7 @@ def load_artists(cfg: Config) -> list[dict[str, Any]]:
 
 
 def load_cma_bios(raw_dir: str | Path) -> dict[str, str]:
-    """Map ``artist_id -> creators[].biography`` (da strip HTML) tu raw CMA."""
+    """Map ``artist_id -> creators[].biography`` (đã strip HTML) từ raw CMA."""
     cma_dir = Path(raw_dir) / "cma"
     if not cma_dir.exists():
         return {}
@@ -1225,19 +1225,19 @@ def load_cma_bios(raw_dir: str | Path) -> dict[str, str]:
     return bios
 
 
-# ngon ngu dua tren he chu duoc dung khi tra cuu Wikidata.
+# ngôn ngữ dựa trên hệ chữ được dùng khi tra cứu Wikidata.
 _LANG_BY_SCRIPT = (
-    ("\u3040", "\u30ff", "ja"),   # hiragana + katakana -> Nhat
-    ("\u4e00", "\u9fff", "zh"),   # han tu -> Trung
-    ("\uac00", "\ud7af", "ko"),   # hangul -> Han Quoc
+    ("\u3040", "\u30ff", "ja"),   # hiragana + katakana -> Nhật
+    ("\u4e00", "\u9fff", "zh"),   # hán tự -> Trung
+    ("\uac00", "\ud7af", "ko"),   # hangul -> Hàn Quốc
 )
 
 
 def guess_script_language(name: str) -> str:
-    """Doan ngon ngu cua mot ten theo he chu.
+    """Đoán ngôn ngữ của một tên theo hệ chữ.
 
-    Ten ``Kano Tan’yū`` (latin, dau) -> ``en``; ``月岡雪鼎`` -> ``ja``;
-    ``林良`` -> ``zh``. Dung cho ``name_in_original_language`` cua CMA.
+    Tên ``Kano Tan’yū`` (latin, dấu) -> ``en``; ``月岡雪鼎`` -> ``ja``;
+    ``林良`` -> ``zh``. Dùng cho ``name_in_original_language`` của CMA.
     """
     if not name:
         return "en"
@@ -1248,11 +1248,11 @@ def guess_script_language(name: str) -> str:
 
 
 def load_cma_original_names(raw_dir: str | Path) -> dict[str, list[str]]:
-    """Map ``artist_id -> [ten goc]`` tu ``creators[].name_in_original_language``.
+    """Map ``artist_id -> [tên gốc]`` từ ``creators[].name_in_original_language``.
 
-    Nhieu hoa si Trung Quoc/Nhat tren CMA co ten Latin trong KB (vi du
-    ``Lin Liang``) nhung nhan Wikidata la chu Han (``林良``). Dung ten goc de
-    tra cuu them voi nhan dung ngon ngu -> nhieu hoa si tim thay hon.
+    Nhiều họa sĩ Trung Quốc/Nhật trên CMA có tên Latin trong KB (ví dụ
+    ``Lin Liang``) nhưng nhãn Wikidata là chữ Hán (``林良``). Dùng tên gốc để
+    tra cứu thêm với nhãn đúng ngôn ngữ -> nhiều họa sĩ tìm thấy hơn.
     """
     cma_dir = Path(raw_dir) / "cma"
     if not cma_dir.exists():
@@ -1289,7 +1289,7 @@ def load_cma_original_names(raw_dir: str | Path) -> dict[str, list[str]]:
 
 # ---------------------------------------------------------------- network
 class RateLimiter:
-    """Dam bao giua hai request lien nhau co it nhat ``min_interval_s`` giay."""
+    """Đảm bảo giữa hai request liền nhau có ít nhất ``min_interval_s`` giây."""
 
     def __init__(
         self,
@@ -1341,7 +1341,7 @@ def http_get_json(
     limiter: RateLimiter | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> Any:
-    """GET JSON co retry. Nem ``HttpNotFound`` khi 404, ``RuntimeError`` khi loi."""
+    """GET JSON có retry. Ném ``HttpNotFound`` khi 404, ``RuntimeError`` khi lỗi."""
     last_error: Exception | None = None
     for attempt in range(max_retries + 1):
         if limiter is not None:
@@ -1372,7 +1372,7 @@ def http_get_json(
             continue
         raise RuntimeError(f"HTTP {status} cho {url}")
 
-    raise RuntimeError(f"Khong goi duoc {url}: {last_error}")
+    raise RuntimeError(f"Không gọi được {url}: {last_error}")
 
 
 def search_entities(
@@ -1386,7 +1386,7 @@ def search_entities(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Tim candidate tren Wikidata bang ten hoa si."""
+    """Tìm candidate trên Wikidata bằng tên họa sĩ."""
     params = {
         "action": "wbsearchentities",
         "search": name,
@@ -1425,7 +1425,7 @@ def fetch_entities(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, Any]:
-    """Lay thuoc tinh cua nhieu QID trong mot request."""
+    """Lấy thuộc tính của nhiều QID trong một request."""
     if not qids:
         return {}
     params = {
@@ -1464,7 +1464,7 @@ def fetch_summary(
     sleep: Callable[[float], None] = time.sleep,
     user_agent: str | None = None,
 ) -> dict[str, Any]:
-    """Lay tom tat bai wikipedia qua REST API."""
+    """Lấy tóm tắt bài wikipedia qua REST API."""
     payload = http_get_json(
         session,
         WIKIPEDIA_SUMMARY + str(title).replace(" ", "_"),
@@ -1504,7 +1504,7 @@ def enrich_artist(
     user_agent: str | None = None,
     cma_bio: str | None = None,
 ) -> dict[str, Any]:
-    """Tra cuu mot hoa si; KHONG nem loi (loi -> ``status="error"``)."""
+    """Tra cứu một họa sĩ; KHÔNG ném lỗi (lỗi -> ``status="error"``)."""
     artist_id = artist.get("artist_id")
     name = artist.get("artist_name")
     birth_year = artist.get("artist_birth")
@@ -1583,7 +1583,7 @@ def enrich_artist(
         )
     except HttpNotFound:
         return build_record(artist, STATUS_NOT_FOUND, cma_bio=cma_bio)
-    except Exception:  # noqa: BLE001 - khong bao gio nem loi ra ngoai
+    except Exception:  # noqa: BLE001 - không bao giờ ném lỗi ra ngoài
         return build_record(artist, STATUS_ERROR, cma_bio=cma_bio)
 
 
@@ -1596,10 +1596,10 @@ def _resolve_with_split(
     limiter: RateLimiter | None,
     user_agent: str | None,
 ) -> list[tuple[str, list[dict[str, Any]]]]:
-    """Giai ten theo lo; neu lo that bai thi tach nho hon va thu lai.
+    """Giải tên theo lô; nếu lô thất bại thì tách nhỏ hơn và thử lại.
 
-    Query SPARQL co the bi timeout khi nhieu ten kho; tach nho giup "dau
-    van" thay vi mat ca lo. Tra list ``(ten, candidates)``.
+    Query SPARQL có thể bị timeout khi nhiều tên khó; tách nhỏ giúp "đậu
+    ván" thay vì mất cả lô. Trả list ``(tên, candidates)``.
     """
     if not names:
         return []
@@ -1616,11 +1616,11 @@ def _resolve_with_split(
         return list(grouped.items())
     except Exception as exc:  # noqa: BLE001
         if len(names) == 1:
-            print(f"  ! SPARQL that bai cho 1 ten ({names[0]}): {exc}", flush=True)
+            print(f"  ! SPARQL thất bại cho 1 tên ({names[0]}): {exc}", flush=True)
             return []
         middle = len(names) // 2
         print(
-            f"  ! SPARQL that bai ({len(names)} ten), tach nho va thu lai: {exc}",
+            f"  ! SPARQL thất bại ({len(names)} tên), tách nhỏ và thử lại: {exc}",
             flush=True,
         )
         out = _resolve_with_split(
@@ -1640,11 +1640,11 @@ def enrich_all(
     force: bool = False,
     session: Any | None = None,
 ) -> dict[str, Any]:
-    """Lam giau tat ca hoa si trong KB; tra ve thong ke.
+    """Làm giàu tất cả họa sĩ trong KB; trả về thống kê.
 
-    Mac dinh dung **che do batch** (SPARQL + Wikipedia ``action=query``) vi
-    Wikimedia chan anonymous API o ~10 request/burst; che do ``single`` (goi
-    tung artist) chi de so sanh va de debug.
+    Mặc định dùng **chế độ batch** (SPARQL + Wikipedia ``action=query``) vì
+    Wikimedia chặn anonymous API ở ~10 request/burst; chế độ ``single`` (gọi
+    từng artist) chỉ để so sánh và để debug.
     """
     p = paths(cfg, ensure=True)
     artists = load_artists(cfg)
@@ -1720,7 +1720,7 @@ def enrich_all(
                 fetched += 1
                 _record_status(record)
         else:
-            # 1) bo qua artist da co cache hop le
+            # 1) bỏ qua artist đã có cache hợp lệ
             pending: list[dict[str, Any]] = []
             for artist in artists:
                 artist_id = artist["artist_id"]
@@ -1732,11 +1732,11 @@ def enrich_all(
                     continue
                 pending.append(artist)
 
-            # 2) giai ten theo lo (SPARQL), gom ca artist trung ten.
-            #    Moi artist duoc tra cuu bang nhieu bien the ten:
-            #    ten KB (`@en` + `@mul`) va ten goc cua CMA (`@ja`/`@zh`/...).
-            #    Can phai vay vi nhan Wikidata cua hoa si Nhat/Trung thuong khong
-            #    co o `en` — chi kiem `en` se bo qua ~120 hoa si.
+            # 2) giải tên theo lô (SPARQL), gồm cả artist trùng tên.
+            #    Mỗi artist được tra cứu bằng nhiều biến thể tên:
+            #    tên KB (`@en` + `@mul`) và tên gốc của CMA (`@ja`/`@zh`/...).
+            #    Cần phải vậy vì nhãn Wikidata của họa sĩ Nhật/Trung thường không
+            #    có ở `en` — chỉ kiểm `en` sẽ bỏ qua ~120 họa sĩ.
             original_names = load_cma_original_names(p.raw)
             artist_terms: dict[str, list[tuple[str, str]]] = {}
             for artist in pending:
@@ -1768,11 +1768,11 @@ def enrich_all(
                 if progress_every > 0 and (start // batch_size + 1) % 5 == 0:
                     print(
                         f"  ... SPARQL {start + len(chunk)}/{len(pending)} "
-                        f"ten da giai: {len(resolved)}",
+                        f"tên đã giải: {len(resolved)}",
                         flush=True,
                     )
 
-            # 3) lay tom tat wikipedia theo lo
+            # 3) lấy tóm tắt wikipedia theo lô
             titles = sorted(
                 {
                     str(c["wiki_title"])
@@ -1798,20 +1798,20 @@ def enrich_all(
                     )
                 except Exception as exc:  # noqa: BLE001
                     print(
-                        f"  ! Wikipedia that bai ({start // extract_batch_size + 1}): {exc}",
+                        f"  ! Wikipedia thất bại ({start // extract_batch_size + 1}): {exc}",
                         flush=True,
                     )
                     chunk = []
                 if progress_every > 0 and (start // extract_batch_size + 1) % 5 == 0:
                     print(
-                        f"  ... Wikipedia {start + len(chunk)}/{len(titles)} bai",
+                        f"  ... Wikipedia {start + len(chunk)}/{len(titles)} bài",
                         flush=True,
                     )
 
-            # 3b) bai chua co extract (API co gioi han `exlimit`) -> fetch lai tung bai
+            # 3b) bài chưa có extract (API có giới hạn `exlimit`) -> fetch lại từng bài
             missing = [t for t in titles if not (extracts.get(t) or {}).get("extract")]
             if missing:
-                print(f"  ... fetch lai {len(missing)} bai thieu extract", flush=True)
+                print(f"  ... fetch lại {len(missing)} bài thiếu extract", flush=True)
                 for title in missing:
                     try:
                         found = fetch_enwiki_by_titles(
@@ -1826,7 +1826,7 @@ def enrich_all(
                         if found.get(title):
                             extracts[title] = found[title]
                         else:
-                            # ten da bi chuyen huong -> API tra ten chuan
+                            # tên đã bị chuyển hướng -> API trả tên chuẩn
                             for page in found.values():
                                 if page.get("extract"):
                                     extracts[title] = page
@@ -1834,10 +1834,10 @@ def enrich_all(
                     except Exception:  # noqa: BLE001
                         continue
 
-            # 4) duong dan du phong: tra cuu enwiki theo TEN BAI khi SPARQL that bai
-            #    (hoa si Trung Quoc: nhan Wikidata la chu Han, bai enwiki la tieng Anh)
+            # 4) đường dẫn dự phòng: tra cứu enwiki theo TÊN BÀI khi SPARQL thất bại
+            #    (họa sĩ Trung Quốc: nhãn Wikidata là chữ Hán, bài enwiki là tiếng Anh)
             def _candidates_for(artist: dict[str, Any]) -> list[dict[str, Any]]:
-                """Gop candidate cua tat ca bien the ten cua mot artist."""
+                """Gộp candidate của tất cả biến thể tên của một artist."""
                 out: list[dict[str, Any]] = []
                 seen: set[str] = set()
                 for term in artist_terms.get(artist["artist_id"], []):
@@ -1883,7 +1883,7 @@ def enrich_all(
                         )
                     except Exception as exc:  # noqa: BLE001
                         print(
-                            f"  ! enwiki fallback that bai "
+                            f"  ! enwiki fallback thất bại "
                             f"({start // extract_batch_size + 1}): {exc}",
                             flush=True,
                         )
@@ -1891,7 +1891,7 @@ def enrich_all(
                     for title, page in found.items():
                         if not page.get("extract"):
                             continue
-                        # chi dung key co thuc la ten da hoi (bo qua ten chuan sau redirect)
+                        # chỉ dùng key có thực là tên đã hỏi (bỏ qua tên chuẩn sau redirect)
                         if title not in fallback_titles:
                             continue
                         if looks_like_disambiguation(
@@ -1901,15 +1901,15 @@ def enrich_all(
                         extracts[title] = page
                         fallback_pages.append((title, page))
                     print(
-                        f"  ... enwiki fallback: {len(unresolved)} artist chua khop, "
-                        f"{len(fallback_titles)} ten da thu, "
-                        f"{len(fallback_pages)} bai co extract",
+                        f"  ... enwiki fallback: {len(unresolved)} artist chưa khớp, "
+                        f"{len(fallback_titles)} tên đã thử, "
+                        f"{len(fallback_pages)} bài có extract",
                         flush=True,
                     )
 
-                # 4b) kiem tra nghe cua cac bai fallback: chi nhan hoa si that su.
-                #     Day la lop bao ve chong false positive (vi du "Muhammad Ali"
-                #     la võ sinh, khong phai hoa si Mughal).
+                # 4b) kiểm tra nghề của các bài fallback: chỉ nhận họa sĩ thật sự.
+                #     Đây là lớp bảo vệ chống false positive (ví dụ "Muhammad Ali"
+                #     là võ sĩ, không phải họa sĩ Mughal).
                 if fallback_pages:
                     qids = sorted(
                         {
@@ -1934,7 +1934,7 @@ def enrich_all(
                                 )
                             )
                         except Exception as exc:  # noqa: BLE001
-                            print(f"  ! kiem tra nghe that bai: {exc}", flush=True)
+                            print(f"  ! kiểm tra nghề thất bại: {exc}", flush=True)
                     rejected = 0
                     birth_map = {
                         str(a["artist_name"]): a.get("artist_birth")
@@ -1969,7 +1969,7 @@ def enrich_all(
                             }
                         )
                     print(
-                        f"  ... fallback occupation check: {rejected} bai bi loai",
+                        f"  ... fallback occupation check: {rejected} bài bị loại",
                         flush=True,
                     )
 
@@ -1996,7 +1996,7 @@ def enrich_all(
                     if summary and looks_like_disambiguation(
                         summary, page.get("is_disambiguation", False)
                     ):
-                        # trang dinh nghia -> khong dung lam tieu su hoa si
+                        # trang định hướng -> không dùng làm tiểu sử họa sĩ
                         summary = None
                         record = build_record(
                             artist,
@@ -2059,26 +2059,26 @@ def enrich_all(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m artrag.data.enrich_wiki",
-        description="Lam giau tieu su hoa si tu Wikidata/Wikipedia (cache raw/wiki).",
+        description="Làm giàu tiểu sử họa sĩ từ Wikidata/Wikipedia (cache raw/wiki).",
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="chi xu ly N hoa si dau (dung de thu nhanh)",
+        help="chỉ xử lý N họa sĩ đầu (dùng để thử nhanh)",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="truy xuat lai ke ca da co cache",
+        help="truy xuất lại kể cả đã có cache",
     )
-    parser.add_argument("--profile", default=None, help="profile config (mac dinh: local)")
+    parser.add_argument("--profile", default=None, help="profile config (mặc định: local)")
     parser.add_argument(
         "--set",
         dest="overrides",
         action="append",
         default=[],
-        help="ghi de config, vi du --set data.wiki_min_interval_s=0.5",
+        help="ghi đè config, ví dụ --set data.wiki_min_interval_s=0.5",
     )
     return parser
 
@@ -2097,12 +2097,12 @@ def main(argv: list[str] | None = None) -> int:
 
     examples = stats.get("examples") or []
     if examples:
-        print("\n-- vi du --")
+        print("\n-- ví dụ --")
         for item in examples:
             print(f"{item.get('name')} -> {item.get('wiki_url')}")
 
     if stats["total"] and stats["hit_rate"] < 0.6 and not args.limit:
-        print("CANH BAO: ty le tim thay duoi 60%")
+        print("CẢNH BÁO: tỷ lệ tìm thấy dưới 60%")
     return 0
 
 

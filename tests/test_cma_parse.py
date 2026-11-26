@@ -1,4 +1,4 @@
-"""Test T1.2: parse ban ghi CMA thanh schema artworks (SYSTEM_DESIGN 2.3)."""
+"""Test T1.2: parse bản ghi CMA thành schema artworks (SYSTEM_DESIGN 2.3)."""
 
 from __future__ import annotations
 
@@ -34,13 +34,13 @@ def eakins(records) -> dict:
 
 @pytest.fixture(scope="module")
 def indian(records) -> dict:
-    # ban ghi thu 2: tranh India, khong co provenance va khong co creator
+    # bản ghi thứ 2: tranh India, không có provenance và không có creator
     return parse_artwork(records[1])
 
 
 @pytest.fixture(scope="module")
 def chinese(records) -> dict:
-    # ban ghi thu 3: tranh Trung Quoc, co creator
+    # bản ghi thứ 3: tranh Trung Quốc, có creator
     return parse_artwork(records[2])
 
 
@@ -109,14 +109,14 @@ def test_eakins_source_and_image(eakins):
     assert eakins["image_path"] is None
 
 
-# ---------------------------------------------------------------- bien the
+# ---------------------------------------------------------------- biến thể
 def test_record_without_provenance(indian):
     assert indian["provenance_text"] is None
     assert indian["prev_owner"] is None
 
 
 def test_asian_painting_is_null_safe(indian):
-    # khong co creator -> khong duoc nem loi
+    # không có creator -> không được ném lỗi
     assert indian["artist_name"] is None
     assert indian["artist_id"] is None
     assert indian["current_location"] is None
@@ -126,7 +126,7 @@ def test_asian_painting_is_null_safe(indian):
 
 
 def test_chinese_painting_with_artist(chinese):
-    # ban ghi thu 3: tranh Trung Quoc, co creator
+    # bản ghi thứ 3: tranh Trung Quốc, có creator
     assert chinese["artist_name"] == "Mi Youren"
     assert chinese["artist_nationality"] == "Chinese"
     assert chinese["artist_birth"] == 1072
@@ -139,7 +139,7 @@ def test_exhibitions_text_capped_and_stripped(eakins, records):
     assert text
     assert "<i>" not in text
     assert "</i>" not in text
-    # so muc gioi han 10 (mo ta trien lam co the chua dau phay)
+    # số mục giới hạn 10 (mô tả triển lãm có thể chứa dấu phẩy)
     assert len(exhibition_items(records[0]["exhibitions"])) <= 10
 
 
@@ -229,7 +229,7 @@ def test_parse_artist_description_with_approximate_year():
     parsed = parse_artist_description("Willem Kalf (Dutch, c. 1629–1684)")
     assert parsed["name"] == "Willem Kalf"
     assert parsed["nationality"] == "Dutch"
-    # "c." -> khong chắc nam sinh -> birth None, death van lay duoc
+    # "c." -> không chắc năm sinh -> birth None, death vẫn lấy được
     assert parsed["birth"] is None
     assert parsed["death"] == 1684
 

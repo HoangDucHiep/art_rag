@@ -28,7 +28,7 @@ def test_optional_step_failure_is_degraded_and_does_not_raise():
     entry = trace.steps[0]
     assert entry["status"] == "degraded"
     assert "OOM" in entry["info"]["error"]
-    # buoc tiep tuc van chay duoc
+    # bước tiếp theo vẫn chạy được
     with trace.step("generate") as step:
         step.set_info(cached=True)
     assert trace.steps[1]["status"] == "ok"

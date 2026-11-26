@@ -1,6 +1,6 @@
 """Test cho T1.4 ``artrag.data.enrich_wiki``.
 
-Tat ca test deu chay **khong can mang**: chi dung ham thuan hoac session gia.
+Tất cả test đều chạy **không cần mạng**: chỉ dùng hàm thuần hoặc session giả.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ def make_entity(
     enwiki: str | None = None,
     birth_years: list[int] | None = None,
 ) -> dict:
-    """Dung entity Wikidata gia cho test."""
+    """Dựng entity Wikidata giả cho test."""
     claims: dict = {}
     if human:
         claims["P31"] = [
@@ -114,22 +114,22 @@ def test_label_score_tolerates_name_reordering():
 
 
 def test_label_score_rejects_different_people_with_shared_tokens():
-    """Hoi quy: `Shen Zhou` co alias `Zhou Chen` -> phai diem thap.
+    """Hồi quy: `Shen Zhou` có alias `Zhou Chen` -> phải điểm thấp.
 
-    `token_set_ratio` cho 88.9 vi chung token `zhou` — du de qua nguong 88
-    va match nham hoa si khac.
+    `token_set_ratio` cho 88.9 vì chung token `zhou` — đủ để qua ngưỡng 88
+    và match nhầm họa sĩ khác.
     """
     assert label_score("Zhou Chen", "Shen Zhou") < 88
     assert label_score("Zhou Chen", "Zhou Chen") == 100.0
 
 
 def test_label_score_handles_initials():
-    """`Joseph Mallord William Turner` phai khop `J. M. W. Turner`."""
+    """`Joseph Mallord William Turner` phải khớp `J. M. W. Turner`."""
     assert label_score("Joseph Mallord William Turner", "J. M. W. Turner") == 100.0
 
 
 def test_label_score_rejects_prefix_names():
-    """`Wang Yuan` va `Wang Yuanqi` la hai hoa si khac."""
+    """`Wang Yuan` và `Wang Yuanqi` là hai họa sĩ khác."""
     assert label_score("Wang Yuan", "Wang Yuanqi") < 88
     assert label_score("Wang Yuan", "Wang Yuan") == 100.0
 
@@ -139,7 +139,7 @@ def test_label_score_handles_curly_apostrophes():
 
 
 def test_label_score_allows_shorter_name_subset():
-    """`Agnolo Bronzino` chua `Bronzino` -> cung mot nguoi."""
+    """`Agnolo Bronzino` chứa `Bronzino` -> cùng một người."""
     assert label_score("Agnolo Bronzino", "Bronzino") == 100.0
 
 
@@ -153,7 +153,7 @@ def test_year_from_time():
 
 
 def test_year_from_time_accepts_sparql_format_without_plus():
-    """SPARQL tra ``1844-07-25T00:00:00Z`` (khong co dau ``+``)."""
+    """SPARQL trả ``1844-07-25T00:00:00Z`` (không có dấu ``+``)."""
     assert year_from_time("1844-07-25T00:00:00Z") == 1844
     assert year_from_time("1254-00-00T00:00:00Z") == 1254
 
@@ -271,12 +271,12 @@ def test_candidate_name_variants_includes_match_text_and_aliases():
     variants = candidate_name_variants(candidate)
     assert "J. M. W. Turner" in variants
     assert "Joseph Mallord William Turner" in variants
-    # khong trung lap
+    # không trùng lặp
     assert len(variants) == len(set(variants))
 
 
 def test_pick_candidate_matches_via_alias_when_label_is_initialism():
-    """Turner: nhan canonical la ``J. M. W. Turner`` nhung CMA goi ten day du."""
+    """Turner: nhãn canonical là ``J. M. W. Turner`` nhưng CMA gọi tên đầy đủ."""
     candidate = {
         "id": "Q159758",
         "label": "J. M. W. Turner",
@@ -297,7 +297,7 @@ def test_pick_candidate_matches_via_alias_when_label_is_initialism():
 
 
 def test_pick_candidate_falls_back_to_description_years():
-    """Khi entity khong co P569, nam trong description cua search result van dung."""
+    """Khi entity không có P569, năm trong description của search result vẫn dùng."""
     candidate = {
         "id": "Q1",
         "label": "Some Painter",
@@ -374,7 +374,7 @@ def test_rate_limiter_enforces_interval():
 
     limiter = RateLimiter(min_interval_s=0.5, sleep=fake_sleep, monotonic=lambda: clock["t"])
     limiter.wait()
-    assert slept == []  # request dau khong can doi
+    assert slept == []  # request đầu không cần đợi
     limiter.wait()
     assert slept and slept[0] == pytest.approx(0.5)
 
@@ -401,7 +401,7 @@ class FakeResponse:
 
 
 class FakeSession:
-    """Session gia: tra cac response theo thu tu."""
+    """Session giả: trả các response theo thứ tự."""
 
     def __init__(self, responses):
         self.responses = list(responses)
@@ -410,7 +410,7 @@ class FakeSession:
     def get(self, url, params=None, headers=None, timeout=None):
         self.calls.append({"url": url, "params": params, "headers": headers})
         if not self.responses:
-            raise AssertionError("het response gia")
+            raise AssertionError("hết response giả")
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -436,7 +436,7 @@ def test_http_get_json_retries_on_429_then_succeeds():
     )
     assert payload == {"ok": True}
     assert len(session.calls) == 2
-    # backoff co ton trong Retry-After
+    # backoff có tôn trọng Retry-After
     assert slept == [3.0]
 
 
@@ -503,18 +503,18 @@ def test_build_sparql_query_contains_values_and_filters():
     assert '"Edgar Degas"@en' in query
     assert "wdt:P31 wd:Q5" in query
     assert "rdfs:label|skos:altLabel" in query
-    # p:P569/ps:P569 lay ca nam sinh o moi rank (khong chi `preferred`)
+    # p:P569/ps:P569 lấy cả năm sinh ở mọi rank (không chỉ `preferred`)
     assert "p:P569/ps:P569" in query
     assert "en.wikipedia.org" in query
 
 
 def test_build_sparql_query_supports_language_tagged_terms():
-    """Ten theo ngon ngu khac `en` phai giu nguyen nhan de tim dung entity."""
+    """Tên theo ngôn ngữ khác `en` phải giữ nguyên nhãn để tìm đúng entity."""
     query = build_sparql_query([("Lin Liang", "zh"), ("月岡雪鼎", "ja")])
     assert '"Lin Liang"@zh' in query
     assert '"月岡雪鼎"@ja' in query
     assert '"Lin Liang"@en' not in query
-    # nhan chuan phai duoc lay rieng de loai nham (Shen Zhou co alias "Zhou Chen")
+    # nhãn chuẩn phải được lấy riêng để loại nhầm (Shen Zhou có alias "Zhou Chen")
     assert "rdfs:label ?canon" in query
 
 
@@ -533,8 +533,8 @@ def test_parse_sparql_rows():
         }
     }
     rows = parse_sparql_rows(payload)
-    # parser giu moi binding co it nhat mot gia tri; viec loai row thieu
-    # `item`/`article` do resolve_names_batch dam nhan
+    # parser giữ mọi binding có ít nhất một giá trị; việc loại row thiếu
+    # `item`/`article` do resolve_names_batch đảm nhận
     assert len(rows) == 2
     assert rows[0]["name"] == "Thomas Eakins"
     assert rows[0]["item"].endswith("Q214905")
@@ -557,7 +557,7 @@ def test_title_from_article_url():
 
 
 def test_title_from_article_url_decodes_percent_encoding():
-    """URL Wikipedia giai ma ky tu: ``Ogata K%C5%8Drin`` -> ``Ogata Kōrin``."""
+    """URL Wikipedia giải mã ký tự: ``Ogata K%C5%8Drin`` -> ``Ogata Kōrin``."""
     assert title_from_article_url("https://en.wikipedia.org/wiki/Ogata_K%C5%8Drin") == "Ogata Kōrin"
     assert (
         title_from_article_url("https://en.wikipedia.org/wiki/Sessh%C5%AB_T%C5%8Dy%C5%8D")
@@ -566,7 +566,7 @@ def test_title_from_article_url_decodes_percent_encoding():
 
 
 def test_is_artist_qid_rejects_non_artists():
-    """Lop bao ve thu hai cho duong dan du phong (theo nghe P106)."""
+    """Lớp bảo vệ thứ hai cho đường dẫn dự phòng (theo nghề P106)."""
     assert is_artist_qid({"occupations": ["Q11338576"], "descriptions": ["American boxer"]}) is False
     assert is_artist_qid({"occupations": [], "descriptions": ["Chinese politician"]}) is False
     assert (
@@ -579,9 +579,9 @@ def test_is_artist_qid_rejects_non_artists():
 
 def test_is_artist_qid_accepts_artists():
     assert is_artist_qid({"occupations": ["Q1028181"], "descriptions": ["Chinese painter"]}) is True
-    # hoa si + thieu nghe -> dung mo ta
+    # họa sĩ + thiếu nghề -> dùng mô tả
     assert is_artist_qid({"occupations": [], "descriptions": ["Japanese painter"]}) is True
-    # khong co du lieu -> khong loai
+    # không có dữ liệu -> không loại
     assert is_artist_qid(None) is True
     assert is_artist_qid({}) is True
 
@@ -590,7 +590,7 @@ def test_birth_year_agrees():
     assert birth_year_agrees({"years": [1254]}, 1254) is True
     assert birth_year_agrees({"years": [1582, 1591]}, 1581) is True
     assert birth_year_agrees({"years": [1942]}, 1590) is False
-    # khong co bang chung phu dinh -> chap nhan
+    # không có bằng chứng phủ định -> chấp nhận
     assert birth_year_agrees({"years": []}, 1590) is True
     assert birth_year_agrees({"years": [1942]}, None) is True
     assert birth_year_agrees(None, 1590) is True
@@ -641,10 +641,10 @@ def test_looks_like_disambiguation():
 
 
 def test_looks_like_disambiguation_only_checks_first_sentence():
-    """Hoi quy: bai hop le co cau "may refer to" o giua van ban khong bi loai.
+    """Hồi quy: bài hợp lệ có câu "may refer to" ở giữa văn bản không bị loại.
 
-    Bai ve hoa si Bronzino co cau "His sobriquet, Bronzino, may refer to his
-    relatively dark skin" — bai nay HOAN TOAN hop le.
+    Bài về họa sĩ Bronzino có câu "His sobriquet, Bronzino, may refer to his
+    relatively dark skin" — bài này HOÀN TOÀN hợp lệ.
     """
     bronzino = (
         "Agnolo di Cosimo (Italian: [ˈaɲɲolo di ˈkɔːzimo]; 17 November 1503 "
@@ -679,13 +679,13 @@ def test_is_artist_description():
     assert is_artist_description("Japanese painter, craftsman") is True
     assert is_artist_description("Chinese mathematician (1930-2021)") is False
     assert is_artist_description("Governor of Michigan") is False
-    # khong co mo ta -> khong loai
+    # không có mô tả -> không loại
     assert is_artist_description(None) is True
     assert is_artist_description("") is True
 
 
 def test_pick_batch_candidate_rejects_non_artist_same_name():
-    """``Wang Yuan`` hoa si, khong phai nha toan hoc cung ten."""
+    """``Wang Yuan`` họa sĩ, không phải nhà toán học cùng tên."""
     candidates = [
         {
             "qid": "Q2601552",
@@ -748,7 +748,7 @@ def test_parse_extract_pages():
 
 
 def test_parse_extract_pages_maps_redirect_names():
-    """API tra ten chuan; ten da hoi phai duoc gan lai de khop."""
+    """API trả tên chuẩn; tên đã hỏi phải được gán lại để khớp."""
     payload = {
         "query": {
             "redirects": [{"from": "Katsushika Hokusai", "to": "Hokusai"}],
@@ -789,10 +789,10 @@ def test_fetch_enwiki_by_titles_returns_qid():
 
 
 def test_pick_batch_candidate_uses_canonical_label_not_matched_name():
-    """Hoi quy: `Shen Zhou` co alias `Zhou Chen` -> phai loai, khong match nham.
+    """Hồi quy: `Shen Zhou` có alias `Zhou Chen` -> phải loại, không match nhầm.
 
-    Truoc day `label` duoc gan bang gia tri da khop nen moi candidate deu goc
-    100 diem, khong phan biet duoc hoa si nao dung nhat.
+    Trước đây `label` được gán bằng giá trị đã khớp nên mọi candidate đều đạt
+    100 điểm, không phân biệt được họa sĩ nào đúng nhất.
     """
     candidates = [
         {
@@ -823,9 +823,9 @@ def test_pick_batch_candidate_uses_canonical_label_not_matched_name():
 
 
 def test_pick_batch_candidate_rejects_wrong_person_by_birth_year():
-    """Khong khop ten -> khong duoc chấp nhận dù entity la hoa si.
+    """Không khớp tên -> không được chấp nhận dù entity là họa sĩ.
 
-    `Shen Zhou` (1427) khac `Zhou Chen` (1460); KB ghi 1445 -> sai nguoi.
+    `Shen Zhou` (1427) khác `Zhou Chen` (1460); KB ghi 1445 -> sai người.
     """
     candidates = [
         {
@@ -928,13 +928,13 @@ def test_build_extract_query_joins_titles():
     assert params["titles"] == "A B|C D"
     assert params["action"] == "query"
     assert params["explaintext"] == 1
-    # `exlimit` phai <= 20 (gioi han user an danh) neu khong se thieu extract
+    # `exlimit` phải <= 20 (giới hạn user ẩn danh) nếu không sẽ thiếu extract
     assert params["exlimit"] == 20
 
 
 # ---------------------------------------------------------------- cma bios
 def test_load_artists_dedups_by_artist_id(tmp_path):
-    """NaN artist_id phai bi bo qua; trung artist_id chi giu 1 dong."""
+    """NaN artist_id phải bị bỏ qua; trùng artist_id chỉ giữ 1 dòng."""
     import pandas as pd
 
     from artrag.data.enrich_wiki import load_artists

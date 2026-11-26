@@ -16,13 +16,13 @@ def test_default_config_has_core_sections():
 
 def test_deep_merge_profile_overrides_default_and_keeps_others():
     cfg = load_config(profile="api")
-    # profile ghi de default
+    # profile ghi đè default
     assert cfg["llm"]["backend"] == "groq"
     assert cfg["query"]["translator"] == "llm"
-    # key khong bi ghi de van giu nguyen tu default
+    # key không bị ghi đè vẫn giữ nguyên từ default
     assert cfg["retrieval"]["top_n"] == 20
     assert cfg["abstain"]["enabled"] is True
-    # nested dict khong bi mat
+    # nested dict không bị mất
     assert cfg["backends"]["groq"]["rpm_limit"] == 30
 
 
@@ -31,7 +31,7 @@ def test_override_dotted_key_and_type_coercion():
     assert cfg["retrieval"]["top_n"] == 12
     assert cfg["abstain"]["enabled"] is False
     assert cfg["llm"]["gen"]["max_new_tokens"] == 64
-    # phan con khong bi de
+    # phần còn lại không bị đè
     assert cfg["retrieval"]["n_clip"] == 50
 
 
@@ -58,7 +58,7 @@ def test_env_interpolation_resolves(monkeypatch, tmp_path):
 def test_env_interpolation_uses_default(monkeypatch):
     monkeypatch.delenv("ARTRAG_PROFILE", raising=False)
     cfg = load_config()
-    # default.yaml dung ${env:ARTRAG_DATA_DIR,./data}; neu bien khong ton tai -> "./data"
+    # default.yaml dùng ${env:ARTRAG_DATA_DIR,./data}; nếu biến không tồn tại -> "./data"
     assert cfg["paths"]["data_dir"] == "./data"
 
 
@@ -74,7 +74,7 @@ def test_config_hash_is_stable_and_sensitive():
     assert config_hash(a) == config_hash(b)
     c = load_config(overrides=["retrieval.top_n=99"])
     assert config_hash(c) != config_hash(a)
-    # hash chi phu thuoc noi dung, khong phu thuoc thu tu khoa
+    # hash chỉ phụ thuộc nội dung, không phụ thuộc thứ tự khóa
     assert config_hash({"a": 1, "b": 2}) == config_hash({"b": 2, "a": 1})
 
 

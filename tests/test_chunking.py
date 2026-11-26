@@ -1,4 +1,4 @@
-"""Test T1.3: quy tac chunking (SYSTEM_DESIGN 2.3)."""
+"""Test T1.3: quy tắc chunking (SYSTEM_DESIGN 2.3)."""
 
 from __future__ import annotations
 
@@ -39,11 +39,11 @@ def test_chunk_sentences_single_chunk_when_short():
 
 
 def test_chunk_sentences_overlap_one_sentence():
-    # moi cau 3 tu -> max 5 tu -> moi chunk gom 1 cau, overlap 1 cau
+    # mỗi câu 3 từ -> max 5 từ -> mỗi chunk gồm 1 câu, overlap 1 câu
     text = "aaa bbb ccc. ddd eee fff. ggg hhh iii. jjj kkk lll."
     chunks = chunk_sentences(text, max_words=5, overlap_sentences=1)
     assert len(chunks) > 1
-    # chunk 2 phai chua lai cau cuoi cua chunk 1
+    # chunk 2 phải chứa lại câu cuối của chunk 1
     assert chunks[0].endswith("aaa bbb ccc.")
     assert chunks[1].startswith("aaa bbb ccc.")
     assert "ddd eee fff." in chunks[1]
@@ -142,7 +142,7 @@ def test_make_chunk_rows_chunk_id_format(row):
 
 def test_make_chunk_rows_field_order(row):
     fields = [c["field"] for c in make_chunk_rows(row)]
-    # overview luon dau, cac field theo thu tu §2.3
+    # overview luôn đầu, các field theo thứ tự §2.3
     assert fields[0] == "overview"
     assert fields.index("description") < fields.index("did_you_know")
     assert fields.index("did_you_know") < fields.index("provenance")

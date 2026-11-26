@@ -1,11 +1,11 @@
-"""T1.1: tai du lieu tu CMA Open Access API theo trang, cache vao raw/cma/.
+"""T1.1: tải dữ liệu từ CMA Open Access API theo trang, cache vào raw/cma/.
 
-Quy tac (SYSTEM_DESIGN 2.4): moi trang luu nguyen body API trong
-``raw/cma/page_{skip:05d}.json`` kem khoa ``_meta`` = {skip, limit, count,
-total, fetched_at}. Mot trang duoc coi la cache hop le khi ``_meta.skip ==
-skip`` va ``_meta.limit >= limit`` yeu cau (va so ban ghi luu khop); neu khong
-thi phai tai lai. He qua: chay ``--limit 50`` roi chay day du se tai lai
-trang 0, vi trang do chi chua 50 ban ghi.
+Quy tắc (SYSTEM_DESIGN 2.4): mỗi trang lưu nguyên body API trong
+``raw/cma/page_{skip:05d}.json`` kèm khóa ``_meta`` = {skip, limit, count,
+total, fetched_at}. Một trang được coi là cache hợp lệ khi ``_meta.skip ==
+skip`` và ``_meta.limit >= limit`` yêu cầu (và số bản ghi lưu khớp); nếu không
+thì phải tải lại. Hệ quả: chạy ``--limit 50`` rồi chạy đầy đủ sẽ tải lại
+trang 0, vì trang đó chỉ chứa 50 bản ghi.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ META_KEY = "_meta"
 
 # ---------------------------------------------------------------- helpers
 def page_path(raw_dir: str | Path, skip: int) -> Path:
-    """Duong dan file cache cua trang co ``skip`` bat dau tu 0."""
+    """Đường dẫn file cache của trang có ``skip`` bắt đầu từ 0."""
     return Path(raw_dir) / "cma" / f"page_{skip:05d}.json"
 
 
@@ -44,7 +44,7 @@ def build_params(
     cc0: bool = True,
     has_image: bool = True,
 ) -> dict[str, Any]:
-    """Tham so truy van CMA API (chi lay tranh CC0 co anh)."""
+    """Tham số truy vấn CMA API (chỉ lấy tranh CC0 có ảnh)."""
     params: dict[str, Any] = {"type": cma_type, "limit": limit, "skip": skip}
     if cc0:
         params["cc0"] = 1
@@ -59,7 +59,7 @@ def _cfg_get(cfg: Config, key: str, default: Any) -> Any:
 
 
 def read_cached_page(path: str | Path) -> dict[str, Any] | None:
-    """Doc trang cache; tra None neu khong ton tai hoac hong."""
+    """Đọc trang cache; trả None nếu không tồn tại hoặc hỏng."""
     p = Path(path)
     if not p.exists():
         return None
@@ -78,10 +78,10 @@ def is_cache_valid(
     skip: int,
     limit: int,
 ) -> bool:
-    """Trang cache hop le khi ``_meta.skip == skip`` va ``_meta.limit >= limit``.
+    """Trang cache hợp lệ khi ``_meta.skip == skip`` và ``_meta.limit >= limit``.
 
-    ``limit`` la so ban ghi **yeu cau** cho trang do; trang da lay day du
-    (1000) van hop le khi hien tai chi can 50 ban ghi.
+    ``limit`` là số bản ghi **yêu cầu** cho trang đó; trang đã lấy đầy đủ
+    (1000) vẫn hợp lệ khi hiện tại chỉ cần 50 bản ghi.
     """
     if payload is None:
         return False
@@ -107,7 +107,7 @@ def with_meta(
     limit: int,
     total: int | None,
 ) -> dict[str, Any]:
-    """Gan khoa ``_meta`` vao body API (khong sua phan ``info``/``data``)."""
+    """Gắn khóa ``_meta`` vào body API (không sửa phần ``info``/``data``)."""
     payload[META_KEY] = {
         "skip": skip,
         "limit": limit,
@@ -119,7 +119,7 @@ def with_meta(
 
 
 def page_total(payload: dict[str, Any]) -> int | None:
-    """Tong so ban ghi theo ``info.total`` (None neu API khong tra)."""
+    """Tổng số bản ghi theo ``info.total`` (None nếu API không trả)."""
     info = payload.get("info")
     if isinstance(info, dict):
         total = info.get("total")
@@ -129,7 +129,7 @@ def page_total(payload: dict[str, Any]) -> int | None:
 
 
 def page_records(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Danh sach ban ghi cua mot trang."""
+    """Danh sách bản ghi của một trang."""
     data = payload.get("data")
     if not isinstance(data, list):
         return []
@@ -147,7 +147,7 @@ def fetch_page(
     user_agent: str = DEFAULT_USER_AGENT,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Goi API mot trang; retry co backoff khi loi mang hoac HTTP 5xx/429."""
+    """Gọi API một trang; retry có backoff khi lỗi mạng hoặc HTTP 5xx/429."""
     last_error: Exception | None = None
     for attempt in range(max_retries + 1):
         try:
@@ -167,7 +167,7 @@ def fetch_page(
             if attempt >= max_retries:
                 break
             sleep(backoff_s * (2**attempt))
-    raise RuntimeError(f"Khong tai duoc trang skip={params.get('skip')}: {last_error}")
+    raise RuntimeError(f"Không tải được trang skip={params.get('skip')}: {last_error}")
 
 
 def fetch_all(
@@ -176,7 +176,7 @@ def fetch_all(
     limit: int | None = None,
     page_size: int | None = None,
 ) -> dict[str, Any]:
-    """Tai cac trang can thiet vao ``raw/cma/``; tra ve thong ke."""
+    """Tải các trang cần thiết vào ``raw/cma/``; trả về thống kê."""
     p = paths(cfg, ensure=True)
     raw_cma = p.raw / "cma"
 
@@ -207,13 +207,13 @@ def fetch_all(
             path = page_path(p.raw, skip)
             payload = None if force else read_cached_page(path)
 
-            # tong so ban ghi: uu tien tu trang dang cache, roi den trang da tai
+            # tổng số bản ghi: ưu tiên từ trang đang cache, rồi đến trang đã tải
             if total is None and payload is not None:
                 total = page_total(payload)
             if total is not None and skip >= total:
-                break  # da lay du so ban ghi
+                break  # đã lấy đủ số bản ghi
 
-            # so ban ghi yeu cau cho trang nay: trang cuoi co the it hon page_size
+            # số bản ghi yêu cầu cho trang này: trang cuối có thể ít hơn page_size
             if remaining is not None:
                 page_limit = min(size, remaining)
             elif total is not None:
@@ -284,32 +284,32 @@ def fetch_all(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m artrag.data.fetch_cma",
-        description="Tai du lieu tu CMA Open Access API (phan trang, cache, retry).",
+        description="Tải dữ liệu từ CMA Open Access API (phân trang, cache, retry).",
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="chi lay N ban ghi dau (dung de thu nhanh)",
+        help="chỉ lấy N bản ghi đầu (dùng để thử nhanh)",
     )
     parser.add_argument(
         "--page-size",
         type=int,
         default=None,
-        help="so ban ghi moi trang (mac dinh lay tu config data.cma_page_size)",
+        help="số bản ghi mỗi trang (mặc định lấy từ config data.cma_page_size)",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="tai lai tat ca trang, bo qua cache",
+        help="tải lại tất cả trang, bỏ qua cache",
     )
-    parser.add_argument("--profile", default=None, help="profile config (mac dinh: local)")
+    parser.add_argument("--profile", default=None, help="profile config (mặc định: local)")
     parser.add_argument(
         "--set",
         dest="overrides",
         action="append",
         default=[],
-        help="ghi de config, vi du --set data.cma_page_size=500",
+        help="ghi đè config, ví dụ --set data.cma_page_size=500",
     )
     return parser
 

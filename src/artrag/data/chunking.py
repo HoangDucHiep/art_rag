@@ -1,12 +1,12 @@
-"""T1.3: quy tac chunking cua KB (SYSTEM_DESIGN 2.3).
+"""T1.3: quy tắc chunking của KB (SYSTEM_DESIGN 2.3).
 
-Moi ham o day deu thuan: khong can du lieu, model hay mang.
+Mọi hàm ở đây đều thuần: không cần dữ liệu, model hay mạng.
 
-- ``description``/``did_you_know``/``artist_bio``: tach theo cau, gop toi
-  ``sentence_max_words`` tu, overlap ``overlap_sentences`` cau.
-- ``provenance``/``exhibitions``: moi field mot chunk, cat o ``field_max_words``.
-- ``overview``: dung mot chunk cho moi tac pham.
-- Moi chunk deu bi hard-cap boi ``max_words_per_chunk`` va khong duoc rong.
+- ``description``/``did_you_know``/``artist_bio``: tách theo câu, gộp tới
+  ``sentence_max_words`` từ, overlap ``overlap_sentences`` câu.
+- ``provenance``/``exhibitions``: mỗi field một chunk, cắt ở ``field_max_words``.
+- ``overview``: đúng một chunk cho mỗi tác phẩm.
+- Mọi chunk đều bị hard-cap bởi ``max_words_per_chunk`` và không được rỗng.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 from artrag.data.cma_parse import overview_text
 from artrag.utils.text import split_sentences
 
-# field nao tach theo cau (co overlap), field nao giu nguyen mot chunk
+# field nào tách theo câu (có overlap), field nào giữ nguyên một chunk
 SENTENCE_FIELDS = ("description", "did_you_know", "artist_bio")
 SINGLE_FIELDS = ("provenance", "exhibitions")
 
@@ -34,7 +34,7 @@ CHUNK_COLUMNS = [
 
 
 def count_words(text: str) -> int:
-    """So tu ( tach theo khoang trang)."""
+    """Số từ (tách theo khoảng trắng)."""
     if not text:
         return 0
     return len(text.split())
@@ -45,10 +45,10 @@ def chunk_sentences(
     max_words: int,
     overlap_sentences: int = 1,
 ) -> list[str]:
-    """Tach van ban thanh cac chunk cau voi ghep den ``max_words`` tu.
+    """Tách văn bản thành các chunk câu với ghép đến ``max_words`` từ.
 
-    Cac chunk lien tiep chia se ``overlap_sentences`` cau cuoi voi chunk sau.
-    Khong sinh chunk rong; cau don le qua dai bi cat cung.
+    Các chunk liên tiếp chia sẻ ``overlap_sentences`` câu cuối với chunk sau.
+    Không sinh chunk rỗng; câu đơn lẻ quá dài bị cắt cứng.
     """
     if not text or not text.strip():
         return []
@@ -62,7 +62,7 @@ def chunk_sentences(
 
     for sentence in sentences:
         sentence_words = count_words(sentence)
-        # cau qua dai -> cat thanh nhieu doan nho
+        # câu quá dài -> cắt thành nhiều đoạn nhỏ
         if sentence_words > max_words:
             if current:
                 chunks.append(" ".join(current))
@@ -91,7 +91,7 @@ def chunk_sentences(
 
 
 def chunk_single(text: str, max_words: int) -> list[str]:
-    """Cat van ban thanh mot chunk (theo tu), dung cho provenance/exhibitions."""
+    """Cắt văn bản thành một chunk (theo từ), dùng cho provenance/exhibitions."""
     if not text or not text.strip():
         return []
     words = text.split()
@@ -118,9 +118,9 @@ def make_chunk_rows(
     overlap_sentences: int = 1,
     max_words_per_chunk: int = 250,
 ) -> list[dict[str, Any]]:
-    """Sinh cac dong chunk cho mot tac pham (theo thu tu field).
+    """Sinh các dòng chunk cho một tác phẩm (theo thứ tự field).
 
-    ``chunk_id`` = ``{artwork_id}#{field}#{i}`` voi ``i`` bat dau tu 0.
+    ``chunk_id`` = ``{artwork_id}#{field}#{i}`` với ``i`` bắt đầu từ 0.
     """
     artwork_id = row.get("artwork_id")
     artist_id = row.get("artist_id")
@@ -143,7 +143,7 @@ def make_chunk_rows(
             piece = piece.strip()
             if not piece:
                 continue
-            # hard-cap moi chunk (ke ca overview)
+            # hard-cap mọi chunk (kể cả overview)
             words = piece.split()
             if len(words) > max_words_per_chunk:
                 piece = " ".join(words[:max_words_per_chunk])

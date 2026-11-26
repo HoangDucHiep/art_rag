@@ -1,4 +1,4 @@
-"""Tien ich xu ly van ban (HTML, chuan hoa, tach cau)."""
+"""Tiện ích xử lý văn bản (HTML, chuẩn hóa, tách câu)."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 _SENTENCE_RE = re.compile(r"[^.!?…]+[.!?…]*")
 _DIACRITIC_RE = re.compile(r"[\u0300-\u036f]")
-# "đ" (U+0111) khong decompose duoi NFD, phai thay the tay.
+# "đ" (U+0111) không decompose dưới NFD, phải thay thế tay.
 _STROKE_D = {"đ": "d", "Đ": "D"}
 
 
 def strip_html(text: str) -> str:
-    """Bo the HTML, giai thuc the, gop khoang trang, cat dau/cuoi."""
+    """Bỏ thẻ HTML, giải thực thể, gộp khoảng trắng, cắt đầu/cuối."""
     if not text:
         return ""
     out = _TAG_RE.sub(" ", text)
@@ -26,7 +26,7 @@ def strip_html(text: str) -> str:
 
 
 def normalize_text(text: str) -> str:
-    """Chuan hoa: bo HTML, lowercase, bo dau tieng Viet, gop khoang trang."""
+    """Chuẩn hóa: bỏ HTML, lowercase, bỏ dấu tiếng Việt, gộp khoảng trắng."""
     if not text:
         return ""
     out = strip_html(text).lower()
@@ -39,7 +39,7 @@ def normalize_text(text: str) -> str:
 
 
 def split_sentences(text: str) -> list[str]:
-    """Tach cau, giu dau cau o cuoi, bo cau rong."""
+    """Tách câu, giữ dấu câu ở cuối, bỏ câu rỗng."""
     if not text:
         return []
     out: list[str] = []

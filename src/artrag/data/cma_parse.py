@@ -1,8 +1,8 @@
-"""T1.2: parse ban ghi CMA thanh schema ``artworks`` cua KB (SYSTEM_DESIGN 2.3).
+"""T1.2: parse bản ghi CMA thành schema ``artworks`` của KB (SYSTEM_DESIGN 2.3).
 
-Cac quy tac parse chi tiet (prev_owner, provenance_text, exhibitions_text,
-overview_text, cach tach ten hoa si) duoc mo ta trong SYSTEM_DESIGN 2.3
-"Quy tac parse cu the". Ham o day deu thuan, test duoc khong can mang.
+Các quy tắc parse chi tiết (prev_owner, provenance_text, exhibitions_text,
+overview_text, cách tách tên họa sĩ) được mô tả trong SYSTEM_DESIGN 2.3
+"Quy tắc parse cụ thể". Hàm ở đây đều thuần, test được không cần mạng.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any
 
 from artrag.utils.text import strip_html
 
-# dau phan cach nam: "1873-1916", "c. 1629", "1815"
+# dấu phân cách năm: "1873-1916", "c. 1629", "1815"
 _YEAR_RE = re.compile(r"(?<![\d.])(\d{3,4})(?![\d.])")
 _BORN_RE = re.compile(r"^(born|b\.)\b", re.IGNORECASE)
 _APPROX_RE = re.compile(r"\b(?:c\.?|circa|ca\.)\b", re.IGNORECASE)
@@ -21,14 +21,14 @@ _CMA_MARKER = "cleveland museum of art"
 
 # ---------------------------------------------------------------- helpers
 def clean_text(value: Any) -> str:
-    """Chuan hoa ve chuoi: bo HTML, cat khoang trang thua, null -> ""."""
+    """Chuẩn hóa về chuỗi: bỏ HTML, cắt khoảng trắng thừa, null -> ""."""
     if value is None:
         return ""
     return strip_html(str(value))
 
 
 def _parse_year(token: str) -> int | None:
-    """Token nam -> int; bo qua 'c.'/'circa' va nam sai dinh dang."""
+    """Token năm -> int; bỏ qua 'c.'/'circa' và năm sai định dạng."""
     match = _YEAR_RE.search(token or "")
     if not match:
         return None
@@ -39,11 +39,11 @@ def _parse_year(token: str) -> int | None:
 
 
 def parse_artist_description(description: str) -> dict[str, Any]:
-    """Tach ``"<Ten> (<Quoc tich>, <năm sinh>–<năm tử>)"``.
+    """Tách ``"<Tên> (<Quốc tịch>, <năm sinh>–<năm tử>)"``.
 
-    Vi du:
+    Ví dụ:
     - ``"Thomas Eakins (American, 1844–1916)"`` -> name/nationality/birth/death
-    - ``"Willem Kalf (Dutch, c. 1629–1684)"`` -> birth = None (co "c.")
+    - ``"Willem Kalf (Dutch, c. 1629–1684)"`` -> birth = None (có "c.")
     - ``"Thomas Cole (American, born England,1801–1848)"`` -> nationality "American"
     """
     result: dict[str, Any] = {
@@ -66,22 +66,22 @@ def parse_artist_description(description: str) -> dict[str, Any]:
         parts = []
 
     if parts:
-        # phan dau la quoc tich; cat "born ..." / "b. ..." o duoi
+        # phần đầu là quốc tịch; cắt "born ..." / "b. ..." ở đuôi
         nationality = parts[0]
         born_match = _BORN_RE.match(nationality)
         if born_match:
             nationality = ""
         nationality = nationality.strip()
         result["nationality"] = nationality or None
-        # phan con la "năm sinh–năm tử" (co thể co "born England" chen giua)
+        # phần còn là "năm sinh–năm tử" (có thể có "born England" chen giữa)
         year_parts = [p for p in parts[1:] if not _BORN_RE.match(p) or _YEAR_RE.search(p)]
-        years: list[tuple[int, bool]] = []  # (nam, khong chan)
+        years: list[tuple[int, bool]] = []  # (năm, không chắc chắn)
         for part in year_parts:
             matches = list(_YEAR_RE.finditer(part))
             approx_positions = [m.start() for m in _APPROX_RE.finditer(part)]
             prev_end = 0
             for match in matches:
-                # "c." / "circa" chi tac do cho nam ngay sau no
+                # "c." / "circa" chỉ tác động cho năm ngay sau nó
                 uncertain = any(prev_end <= pos < match.start() for pos in approx_positions)
                 years.append((int(match.group(1)), uncertain))
                 prev_end = match.end()
@@ -94,7 +94,7 @@ def parse_artist_description(description: str) -> dict[str, Any]:
 
 
 def pick_primary_artist(record: dict[str, Any]) -> dict[str, Any] | None:
-    """Chon creator co ``role == "artist"`` dau tien; None neu khong co."""
+    """Chọn creator có ``role == "artist"`` đầu tiên; None nếu không có."""
     creators = record.get("creators")
     if not isinstance(creators, list):
         return None
@@ -110,7 +110,7 @@ def pick_primary_artist(record: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def artist_info(record: dict[str, Any]) -> dict[str, Any]:
-    """Thong tin hoa si chinh cua ban ghi (null-safe)."""
+    """Thông tin họa sĩ chính của bản ghi (null-safe)."""
     creator = pick_primary_artist(record)
     if creator is None:
         return {
@@ -132,14 +132,14 @@ def artist_info(record: dict[str, Any]) -> dict[str, Any]:
         "artist_name": parsed["name"],
         "artist_role": creator.get("role"),
         "artist_nationality": parsed["nationality"],
-        # uu tien nam so tu API, fallback ve nam tach tu description
+        # ưu tiên năm số từ API, fallback về năm tách từ description
         "artist_birth": _parse_year(str(birth)) if birth else parsed["birth"],
         "artist_death": _parse_year(str(death)) if death else parsed["death"],
     }
 
 
 def provenance_text(entries: Any) -> str:
-    """Ghiep cac entry provenance thanh ``"date: description"`` noi bang "; "."""
+    """Ghép các entry provenance thành ``"date: description"`` nối bằng "; "."""
     if not isinstance(entries, list):
         return ""
     parts: list[str] = []
@@ -155,10 +155,10 @@ def provenance_text(entries: Any) -> str:
 
 
 def prev_owner(entries: Any) -> str | None:
-    """Chu so huu ngay truoc CMA: entry ngay truoc entry CMA cuoi cung.
+    """Chủ sở hữu ngay trước CMA: entry ngay trước entry CMA cuối cùng.
 
-    Lay phan ten truoc dau ``[`` hoac dau ``,`` dau tien. ``None`` neu entry
-    CMA la entry dau tien.
+    Lấy phần tên trước dấu ``[`` hoặc dấu ``,`` đầu tiên. ``None`` nếu entry
+    CMA là entry đầu tiên.
     """
     if not isinstance(entries, list):
         return None
@@ -179,7 +179,7 @@ def prev_owner(entries: Any) -> str | None:
     if not description:
         return None
 
-    # cat phan trong ngoac vuong truoc (chua nam sinh) hoac truoc dau phay
+    # cắt phần trong ngoặc vuông trước (chứa năm sinh) hoặc trước dấu phẩy
     name = description.split("[", 1)[0]
     name = name.split(",", 1)[0]
     name = name.strip(" .;:-")
@@ -188,7 +188,7 @@ def prev_owner(entries: Any) -> str | None:
 
 
 def exhibition_items(exhibitions: Any, max_items: int = 10) -> list[dict[str, Any]]:
-    """Danh sach trien lam hien tai, moi nhat truoc, toi da ``max_items`` muc."""
+    """Danh sách triển lãm hiện tại, mới nhất trước, tối đa ``max_items`` mục."""
     if not isinstance(exhibitions, dict):
         return []
     current = exhibitions.get("current")
@@ -220,12 +220,12 @@ def exhibition_items(exhibitions: Any, max_items: int = 10) -> list[dict[str, An
 
 
 def exhibitions_text(exhibitions: Any, max_items: int = 10) -> str:
-    """Chuoi trien lam, noi bang "; " (xem ``exhibition_items`` cho dang du lieu)."""
+    """Chuỗi triển lãm, nối bằng "; " (xem ``exhibition_items`` cho dạng dữ liệu)."""
     return "; ".join(item["text"] for item in exhibition_items(exhibitions, max_items))
 
 
 def overview_text(row: dict[str, Any]) -> str:
-    """Chuoi tong quan theo template §2.3 (bo muc rong, them "(on view)")."""
+    """Chuỗi tổng quan theo template §2.3 (bỏ mục rỗng, thêm "(on view)")."""
     artist = row.get("artist_name")
     if artist:
         nationality = row.get("artist_nationality")
@@ -266,7 +266,7 @@ def _culture_text(culture: Any) -> str:
 
 
 def parse_artwork(record: dict[str, Any]) -> dict[str, Any]:
-    """Ban ghi CMA -> dict dong cua ``artworks.parquet`` ( dung cot §2.3)."""
+    """Bản ghi CMA -> dict dòng của ``artworks.parquet`` (đúng cột §2.3)."""
     cma_id = record.get("id")
     accession = record.get("accession_number")
     images = record.get("images")

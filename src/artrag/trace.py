@@ -1,4 +1,4 @@
-"""Trace pipeline: do thoi gian theo buoc, phan loai step bat buoc / tuy chon (SYSTEM_DESIGN 6.6)."""
+"""Trace pipeline: đo thời gian theo bước, phân loại step bắt buộc / tùy chọn (SYSTEM_DESIGN 6.6)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ STATUS_ERROR = "error"
 
 
 class Step:
-    """Handle cua mot buoc, dung trong `with trace.step(...) as s:` de them thong tin."""
+    """Handle của một bước, dùng trong `with trace.step(...) as s:` để thêm thông tin."""
 
     __slots__ = ("name", "info")
 
@@ -32,7 +32,7 @@ class Step:
 
 
 class Trace:
-    """Thu thong tin truy xuat cua mot request (xem mau trong §6.6)."""
+    """Thu thông tin truy xuất của một request (xem mẫu trong §6.6)."""
 
     def __init__(
         self,
@@ -53,19 +53,19 @@ class Trace:
         self.raw_llm_answer: str | None = None
         self._start = time.perf_counter()
 
-    # -- buoc ------------------------------------------------------------
+    # -- bước ------------------------------------------------------------
     @contextmanager
     def step(self, name: str, required: bool = True) -> Iterator[Step]:
-        """Context manager bao quanh mot buoc pipeline.
+        """Context manager bao quanh một bước pipeline.
 
-        - ``required=True`` (mac dinh): loi duoc ghi lai va nem lai.
-        - ``required=False``: loi bi ghi ``status="degraded"`` va luong tiep tuc.
+        - ``required=True`` (mặc định): lỗi được ghi lại và ném lại.
+        - ``required=False``: lỗi bị ghi ``status="degraded"`` và luồng tiếp tục.
         """
         handle = Step(name)
         started = time.perf_counter()
         try:
             yield handle
-        except Exception as exc:  # noqa: BLE001 - xu ly chung cho ca hai nhanh
+        except Exception as exc:  # noqa: BLE001 - xử lý chung cho cả hai nhánh
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             info: dict[str, Any] = dict(handle.info)
             info["error"] = f"{type(exc).__name__}: {exc}"[:500]
@@ -94,13 +94,13 @@ class Trace:
                 }
             )
 
-    # -- tong hop --------------------------------------------------------
+    # -- tổng hợp --------------------------------------------------------
     @property
     def total_ms(self) -> int:
         return int((time.perf_counter() - self._start) * 1000)
 
     def to_dict(self) -> dict[str, Any]:
-        """Dict JSON-serializable dung cho predictions.jsonl va UI."""
+        """Dict JSON-serializable dùng cho predictions.jsonl và UI."""
         return {
             "request_id": self.request_id,
             "config_hash": self.config_hash,
@@ -117,7 +117,7 @@ class Trace:
         }
 
     def summary(self) -> str:
-        """Bang tom tat: name | ms | status."""
+        """Bảng tóm tắt: name | ms | status."""
         lines = ["step | ms | status"]
         for step in self.steps:
             lines.append(f"{step['name']} | {step['ms']} | {step['status']}")

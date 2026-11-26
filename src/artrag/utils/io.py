@@ -1,4 +1,4 @@
-"""Tien ich doc/ghi file."""
+"""Tiện ích đọc/ghi file."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Iterable
 
 
 def ensure_dir(path: str | os.PathLike[str]) -> Path:
-    """Tao thu muc (va cha) neu chua ton tai; tra ve Path."""
+    """Tạo thư mục (và cha) nếu chưa tồn tại; trả về Path."""
     p = Path(path)
     p.mkdir(parents=True, exist_ok=True)
     return p
@@ -21,7 +21,7 @@ def read_json(path: str | os.PathLike[str]) -> Any:
 
 
 def write_json(path: str | os.PathLike[str], obj: Any, indent: int = 2) -> Path:
-    """Ghi JSON (atomic: ghi file tam roi replace)."""
+    """Ghi JSON (atomic: ghi file tạm rồi replace)."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(p.suffix + ".tmp")
@@ -32,7 +32,7 @@ def write_json(path: str | os.PathLike[str], obj: Any, indent: int = 2) -> Path:
 
 
 def read_jsonl(path: str | os.PathLike[str]) -> list[Any]:
-    """Doc file jsonl; dong rong bi bo qua."""
+    """Đọc file jsonl; dòng rỗng bị bỏ qua."""
     p = Path(path)
     if not p.exists():
         return []
@@ -47,7 +47,7 @@ def read_jsonl(path: str | os.PathLike[str]) -> list[Any]:
 
 
 def write_jsonl(path: str | os.PathLike[str], rows: Iterable[Any]) -> Path:
-    """Ghi file jsonl (atomic: ghi file tam roi replace)."""
+    """Ghi file jsonl (atomic: ghi file tạm rồi replace)."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(p.suffix + ".tmp")

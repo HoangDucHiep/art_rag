@@ -1,4 +1,4 @@
-"""Test T1.1: fetch_cma phan trang, cache trang, retry, gioi han --limit."""
+"""Test T1.1: fetch_cma phân trang, cache trang, retry, giới hạn --limit."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class FakeResponse:
 
 
 class FakeSession:
-    """Session gia: ghi lai cac lan goi, phai len trang theo ``skip``."""
+    """Session giả: ghi lại các lần gọi, phản hồi trang theo ``skip``."""
 
     def __init__(self, pages: dict[int, dict], fail_first: int = 0):
         self.pages = pages
@@ -81,10 +81,10 @@ def test_build_params_filters_cc0_and_images():
 def test_cache_valid_requires_matching_skip_and_enough_limit():
     payload = {"data": [], "_meta": {"skip": 0, "limit": 1000, "count": 0}}
     assert fetch_cma.is_cache_valid(payload, 0, 1000)
-    assert fetch_cma.is_cache_valid(payload, 0, 50)  # trang day du van du cho 50
+    assert fetch_cma.is_cache_valid(payload, 0, 50)  # trang đầy đủ vẫn đủ cho 50
     assert not fetch_cma.is_cache_valid(payload, 1000, 1000)  # sai skip
-    assert not fetch_cma.is_cache_valid(payload, 0, 2000)  # trang cua toi hon yeu cau
-    assert not fetch_cma.is_cache_valid({"data": []}, 0, 10)  # thieu _meta
+    assert not fetch_cma.is_cache_valid(payload, 0, 2000)  # trang cũ ít hơn yêu cầu
+    assert not fetch_cma.is_cache_valid({"data": []}, 0, 10)  # thiếu _meta
     assert not fetch_cma.is_cache_valid(None, 0, 10)
 
 
@@ -130,7 +130,7 @@ def test_second_run_reuses_cache_without_network(cfg, monkeypatch):
     assert stats["cached_pages"] == 1
     assert stats["fetched_pages"] == 0
     assert stats["records"] == 50
-    assert len(session.calls) == calls_after_first  # khong goi mang them
+    assert len(session.calls) == calls_after_first  # không gọi mạng thêm
 
 
 def test_force_refetches_even_when_cached(cfg, monkeypatch):
@@ -176,7 +176,7 @@ def test_full_run_paginates_until_total(cfg, monkeypatch):
 
 
 def test_last_partial_page_is_cached_not_refetched(cfg, monkeypatch):
-    """Trang cuoi it hon page_size (964 < 1000) phai duoc xem la cache hop le."""
+    """Trang cuối ít hơn page_size (964 < 1000) phải được xem là cache hợp lệ."""
     pages = {
         0: _page(list(range(1000))),
         1000: _page(list(range(1000, 2000))),
@@ -195,7 +195,7 @@ def test_last_partial_page_is_cached_not_refetched(cfg, monkeypatch):
     assert second["fetched_pages"] == 0
     assert second["cached_pages"] == 4
     assert second["records"] == 3964
-    assert len(session.calls) == calls_after_first  # khong goi mang them
+    assert len(session.calls) == calls_after_first  # không gọi mạng thêm
 
 
 def test_no_extra_page_created_beyond_total(cfg, monkeypatch):
@@ -217,7 +217,7 @@ def test_retry_on_network_error_then_success(cfg, monkeypatch):
     stats = fetch_cma.fetch_all(cfg, limit=10)
 
     assert stats["records"] == 10
-    assert len(session.calls) == 3  # 2 lan fail + 1 lan thanh cong
+    assert len(session.calls) == 3  # 2 lần fail + 1 lần thành công
 
 
 def test_retry_gives_up_after_max_retries(cfg, monkeypatch):
