@@ -14,6 +14,7 @@ from artrag.errors import BackendError
 from artrag.llm.base import LLMBackend, LLMResult, count_message_tokens, estimate_tokens
 from artrag.llm.cache import CachedBackend, cache_key
 from artrag.llm.fallback import FallbackBackend
+from artrag.llm.hf_local import HFLocalBackend, build_hf_local
 from artrag.llm.openai_compat import (
     OpenAICompatBackend,
     build_openai_compat,
@@ -23,7 +24,10 @@ from artrag.llm.openai_compat import (
 from artrag.llm.retry import RateLimiter, RetryBackend
 
 #: Các backend chưa được hỗ trợ ở T2.3 (sẽ bổ sung ở T2.4/T2.5).
-PENDING_BACKENDS = ("hf_local", "flan_t5")
+PENDING_BACKENDS = ("flan_t5",)
+
+#: Backend chạy local: lỗi cục bộ không hết khi thử lại nên **không** retry.
+LOCAL_BACKENDS = ("hf_local",)
 
 
 def load_env() -> None:
@@ -77,6 +81,10 @@ def _build_single(name: str, cfg: Any) -> LLMBackend:
     node = _backend_node(cfg, name)
     backend_type = str(node.get("type") or "openai_compat") if node else None
 
+    if backend_type == "hf_local" or (node is None and name in LOCAL_BACKENDS):
+        # Model nạp lazy qua registry nên dựng backend rất nhanh.
+        return build_hf_local(cfg, node, name=name)
+
     if backend_type == "openai_compat":
         if node is None:
             raise BackendError(
@@ -106,10 +114,17 @@ def _build_single(name: str, cfg: Any) -> LLMBackend:
 
 
 def _wrap_chain(backend: LLMBackend, cfg: Any, cache_dir: Path | None) -> LLMBackend:
-    """Bọc backend bằng cache + retry (cache bên trong, retry bên ngoài)."""
+    """Bọc backend bằng cache + retry (cache bên trong, retry bên ngoài).
+
+    Backend chạy **local** (`hf_local`) chỉ được bọc `CachedBackend`: lỗi cục
+    bộ (OOM, thiếu bitsandbytes) không hết khi thử lại, mà mỗi lần thử lại tốn
+    hàng chục giây nạp model. Vì vậy `RetryBackend` chỉ dùng cho backend API.
+    """
     chain: LLMBackend = backend
     if cache_dir is not None:
         chain = CachedBackend(chain, cache_dir, enabled=True)
+    if getattr(backend, "name", "") in LOCAL_BACKENDS:
+        return chain
     max_retries = int(_cfg_get(cfg, "llm.max_retries", 5))
     backoff_s = float(_cfg_get(cfg, "llm.backoff_s", 1.0))
     limiter = None
@@ -161,12 +176,15 @@ def get_backend(
 __all__ = [
     "CachedBackend",
     "FallbackBackend",
+    "HFLocalBackend",
     "LLMBackend",
     "LLMResult",
+    "LOCAL_BACKENDS",
     "OpenAICompatBackend",
     "PENDING_BACKENDS",
     "RateLimiter",
     "RetryBackend",
+    "build_hf_local",
     "build_openai_compat",
     "cache_key",
     "count_message_tokens",

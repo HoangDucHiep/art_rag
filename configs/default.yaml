@@ -127,6 +127,11 @@ llm:
   cache_dir: llm
 
 backends:
+  # Backend chạy local trên máy: model causal LM lấy từ ModelRegistry
+  # (configs/models.yaml). Nạp lazy -> dựng backend không tốn VRAM.
+  hf_local:
+    type: hf_local
+    model: qwen3b
   groq:
     type: openai_compat
     base_url: https://api.groq.com/openai/v1

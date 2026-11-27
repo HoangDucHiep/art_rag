@@ -76,6 +76,10 @@ def _run_inference(handle: ModelHandle, image: Any, query: str) -> str:
             "This artwork shows two men rowing a boat.",
         )
         return f"nli_label={label}"
+    if task == "causal_lm":
+        # Sinh thử một câu ngắn để kiểm tra model causal LM hoạt động.
+        source = "Xin chào" if "vi2en" in handle.name else "What is the capital of Vietnam?"
+        return f"generate='{inference.generate_text(handle, source)}' (from '{source}')"
     raise ArtragError(f"Không có logic suy luận cho task {task!r}")
 
 

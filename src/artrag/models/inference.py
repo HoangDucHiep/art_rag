@@ -176,3 +176,48 @@ def nli_label(handle: ModelHandle, premise: str, hypothesis: str) -> str:
     id2label = getattr(handle.model.config, "id2label", {}) or {}
     label = id2label.get(index, index)
     return str(label).lower()
+
+
+def generate_text(handle: ModelHandle, prompt: str, **gen: Any) -> str:
+    """Sinh văn bản tự do bằng model causal LM (Qwen).
+
+    Dùng `apply_chat_template` nếu model có chat template, nếu không thì dùng
+    định dạng phẳng `user: ...\nassistant:`.
+    """
+    _require(handle, "generate_text", "causal_lm")
+    import torch  # noqa: PLC0415
+
+    defaults: dict[str, Any] = {"max_new_tokens": 32}
+    defaults.update(gen)
+
+    tokenizer = handle.processor
+    text = prompt
+    chat_template = getattr(tokenizer, "chat_template", None)
+    if chat_template:
+        try:
+            text = tokenizer.apply_chat_template(
+                [{"role": "user", "content": prompt}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        except Exception:  # noqa: BLE001 - template lỗi thì dùng định dạng phẳng
+            text = f"user: {prompt}\nassistant:"
+
+    inputs = tokenizer(text, return_tensors="pt", truncation=True)
+    inputs = {k: v.to(handle.device) for k, v in inputs.items()}
+    prompt_len = int(inputs["input_ids"].shape[-1])
+
+    generation_kwargs: dict[str, Any] = dict(defaults)
+    generation_kwargs["do_sample"] = bool(defaults.get("temperature", 0.0))
+    if not generation_kwargs["do_sample"]:
+        for key in ("temperature", "top_p", "top_k"):
+            generation_kwargs[key] = None
+    pad_id = getattr(tokenizer, "pad_token_id", None)
+    if pad_id is None:
+        pad_id = getattr(tokenizer, "eos_token_id", 0)
+    generation_kwargs["pad_token_id"] = int(pad_id)
+
+    with torch.no_grad():
+        outputs = handle.model.generate(**inputs, **generation_kwargs)
+    generated = outputs[0][prompt_len:]
+    return tokenizer.decode(generated, skip_special_tokens=True).strip()

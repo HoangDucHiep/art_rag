@@ -24,7 +24,7 @@ blip_cap:    {task: blip_cap,   hf_id: Salesforce/blip-image-captioning-base, dt
 blip_vqa:    {task: blip_vqa,   hf_id: Salesforce/blip-vqa-base,            dtype: fp16, est_vram_mb: 800,  devices: [cuda, cpu]}
 vi2en:       {task: seq2seq,    hf_id: vinai/vinai-translate-vi2en-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda], src_lang: vi_VN, tgt_lang: en_XX}
 en2vi:       {task: seq2seq,    hf_id: vinai/vinai-translate-en2vi-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda], src_lang: en_XX, tgt_lang: vi_VN}
-qwen3b:      {task: causal_lm,  hf_id: Qwen/Qwen2.5-3B-Instruct, quant: 4bit, est_vram_mb: 2400, devices: [cuda]}
+qwen3b:      {task: causal_lm,  hf_id: Qwen/Qwen2.5-3B-Instruct, dtype: fp16, quant: 4bit, est_vram_mb: 2400, devices: [cuda]}
 qwen1_5b:    {task: causal_lm,  hf_id: Qwen/Qwen2.5-1.5B-Instruct, dtype: fp16, est_vram_mb: 3300, devices: [cuda, cpu]}
 flan_t5:     {task: seq2seq,    hf_id: google/flan-t5-base,                 dtype: fp32, est_vram_mb: 1000, devices: [cuda, cpu]}
 nli:         {task: nli,        hf_id: MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7, dtype: fp16, est_vram_mb: 550, devices: [cuda, cpu]}

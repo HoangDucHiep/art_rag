@@ -37,4 +37,8 @@ models:
     dtype: fp16
     devices: [cuda, cpu]
   qwen3b:
+    # 4-bit của bitsandbytes chỉ chạy được trên GPU (không có backend CPU).
+    devices: [cuda]
+  qwen1_5b:
+    # Đường lùi khi bitsandbytes lỗi trên Windows: fp16 trên GPU, CPU nếu hết VRAM.
     devices: [cuda, cpu]

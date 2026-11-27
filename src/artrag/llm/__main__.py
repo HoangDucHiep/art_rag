@@ -95,9 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.model:
-        for layer in _layers(backend):
-            if hasattr(layer, "model"):
-                layer.model = args.model
+        _apply_model_override(backend, args.model)
 
     try:
         result = backend.generate(messages, **gen)
@@ -117,9 +115,41 @@ def main(argv: list[str] | None = None) -> int:
         f"| cached={result.cached} | prompt_tokens={result.prompt_tokens} "
         f"| completion_tokens={result.completion_tokens}"
     )
+    _print_extra_metrics(result)
     print("---")
     print(result.text)
     return 0
+
+
+def _print_extra_metrics(result) -> None:
+    """In thêm số đo của backend local (VRAM, tokens/giây, thiết bị)."""
+    raw = getattr(result, "raw", None) or {}
+    if not isinstance(raw, dict) or "tokens_per_s" not in raw:
+        return
+    parts = [
+        f"device={raw.get('device')}",
+        f"dtype={raw.get('dtype')}",
+    ]
+    if raw.get("quant"):
+        parts.append(f"quant={raw['quant']}")
+    parts.append(f"vram_mb={raw.get('vram_mb', 0):.1f}")
+    parts.append(f"tokens_per_s={raw.get('tokens_per_s', 0):.2f}")
+    print(" | ".join(parts))
+
+
+def _apply_model_override(backend: object, model_name: str) -> None:
+    """Ghi đè model của backend.
+
+    Backend hỗ trợ `set_model()` (vd. `hf_local` đổi tên model trong registry)
+    thì dùng cách đó; nếu không thì gán thuộc tính `model` trên từng lớp bọc.
+    """
+    for layer in _layers(backend):
+        setter = getattr(layer, "set_model", None)
+        if callable(setter):
+            setter(model_name)
+            continue
+        if hasattr(layer, "model"):
+            layer.model = model_name
 
 
 def _layers(backend: object) -> list[object]:

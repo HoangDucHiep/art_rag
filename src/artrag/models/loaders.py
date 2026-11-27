@@ -270,6 +270,130 @@ def load_nli(spec: ModelSpec, device: str, dtype: str) -> tuple[Any, Any]:
     )
 
 
+# ---------------------------------------------------------------------------
+# LLM chạy local (causal LM)
+# ---------------------------------------------------------------------------
+
+
+def _bitsandbytes_config(dtype: str) -> Any:
+    """Tạo `BitsAndBytesConfig` cho lượng tử hoá 4-bit (NF4).
+
+    Bắt lỗi import của `bitsandbytes` ngay tại đây để thông báo lỗi có ý nghĩa
+    (bitsandbytes thường lỗi trên Windows với GPU không hỗ trợ đầy đủ).
+    """
+    try:
+        from transformers import BitsAndBytesConfig  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover - transformers luôn có sẵn
+        raise ModelLoadError(
+            "transformers không có BitsAndBytesConfig.",
+            hint="cài lại transformers>=4.46,<4.47",
+        ) from exc
+
+    compute_dtype = torch_dtype(dtype)
+    return BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=compute_dtype,
+        bnb_4bit_use_double_quant=True,
+    )
+
+
+def _load_causal_lm_4bit(spec: ModelSpec, device: str, dtype: str) -> tuple[Any, Any]:
+    """Nạp model causal LM ở chế độ 4-bit (bitsandbytes).
+
+    Với 4-bit, bitsandbytes tự quản lý vị trí tham số nên ta **không** dùng
+    `device_map="auto"` (registry là nguồn sự thật duy nhất về thiết bị) mà
+    dùng `device_map={"": device}` để đặt toàn bộ model lên đúng thiết bị.
+
+    `low_cpu_mem_usage` bị bỏ qua vì bitsandbytes yêu cầu `accelerate` với
+    cấu hình khác.
+    """
+    import torch  # noqa: PLC0415 - import cục bộ có chủ đích
+    from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: PLC0415
+
+    if not str(device).startswith("cuda"):
+        raise ModelLoadError(
+            f"Model {spec.name!r} dùng lượng tử hoá 4-bit chỉ chạy được trên GPU, "
+            f"nhưng registry chọn thiết bị {device!r}.",
+            hint=(
+                "đặt `devices: [cuda]` cho model này trong configs/profiles/local.yaml, "
+                "hoặc dùng model fp16 (qwen1_5b) cho thiết bị CPU."
+            ),
+        )
+
+    quant_config = _bitsandbytes_config(dtype)
+
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            spec.hf_id,
+            quantization_config=quant_config,
+            device_map={"": device},
+            low_cpu_mem_usage=True,
+        )
+    except ImportError as exc:
+        raise ModelLoadError(
+            f"Không nạp được {spec.hf_id!r} ở chế độ 4-bit: bitsandbytes chưa được "
+            f"cài đặt ({exc}).",
+            hint=(
+                "cài bitsandbytes (`uv sync`) hoặc dùng model fp16 "
+                "`qwen1_5b` (đặt `llm.model: qwen1_5b` trong config)."
+            ),
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - bọc lại thành lỗi riêng của hệ thống
+        raise ModelLoadError(
+            f"Không nạp được {spec.hf_id!r} ở chế độ 4-bit: {exc}",
+            hint=(
+                "bitsandbytes có thể không hỗ trợ GPU/driver này; dùng model fp16 "
+                "`qwen1_5b` thay thế (đặt `llm.model: qwen1_5b` trong config)."
+            ),
+        ) from exc
+
+    model.eval()
+
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(spec.hf_id)
+    except Exception as exc:  # noqa: BLE001
+        raise ModelLoadError(
+            f"Không nạp được tokenizer cho {spec.hf_id!r}: {exc}"
+        ) from exc
+
+    # Chat template + generate cần pad bên trái.
+    if tokenizer is not None:
+        tokenizer.padding_side = "left"
+        if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+    del torch
+    return model, tokenizer
+
+
+@register_loader("causal_lm")
+def load_causal_lm(spec: ModelSpec, device: str, dtype: str) -> tuple[Any, Any]:
+    """Model sinh văn bản (causal LM) chạy local: Qwen2.5 cho backend `hf_local`.
+
+    - `quant: 4bit` -> dùng bitsandbytes (NF4), model phải nằm trên GPU.
+    - còn lại -> nạp thường theo `_load_hf` (fp16 trên cuda, fp32 trên CPU).
+    """
+    if spec.quant:
+        if str(spec.quant).lower() not in {"4bit", "4-bit", "nf4"}:
+            raise ModelLoadError(
+                f"Model {spec.name!r} yêu cầu quant={spec.quant!r} không hợp lệ.",
+                hint="chỉ hỗ trợ `4bit` cho causal_lm.",
+            )
+        return _load_causal_lm_4bit(spec, device, dtype)
+
+    from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: PLC0415
+
+    return _load_hf(
+        spec,
+        device,
+        dtype,
+        AutoModelForCausalLM,
+        processor_cls=AutoTokenizer,
+        model_kwargs={"trust_remote_code": False},
+    )
+
+
 #: Các task đã có loader trong module này.
 REGISTERED_TASKS = (
     "clip",
@@ -279,4 +403,5 @@ REGISTERED_TASKS = (
     "blip_vqa",
     "seq2seq",
     "nli",
+    "causal_lm",
 )

@@ -36,6 +36,10 @@ dependencies = [
     "protobuf>=4.25",
     # sentencepiece: tokenizer MBart của model vinai (vi2en/en2vi) cần thư viện này.
     "sentencepiece>=0.2",
+    # bitsandbytes: lượng tử hoá 4-bit (NF4) cho model causal_lm (qwen3b, T2.4).
+    # Chỉ cần cho GPU. Nếu lỗi khi cài trên máy khác -> bỏ dòng này và dùng
+    # model fp16 `qwen1_5b` (đường lùi đã ghi trong SYSTEM_DESIGN §10.1).
+    "bitsandbytes>=0.45",
 ]
 
 [dependency-groups]

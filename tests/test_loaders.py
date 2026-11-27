@@ -36,13 +36,15 @@ from artrag.models.loaders import (
 # ---------------------------------------------------------------------------
 
 
-def test_all_seven_tasks_have_loaders():
+def test_all_registered_tasks_have_loaders():
     for task in REGISTERED_TASKS:
         assert task in LOADERS, f"thiếu loader cho task {task!r}"
         assert callable(LOADERS[task])
 
 
-def test_registered_tasks_is_exactly_the_seven():
+def test_registered_tasks_is_exactly_the_expected_set():
+    # T2.2 đăng ký 7 loader thị giác/embedding; T2.4 thêm `causal_lm` cho
+    # backend `hf_local` (Qwen chạy local).
     assert set(REGISTERED_TASKS) == {
         "clip",
         "sbert",
@@ -51,6 +53,7 @@ def test_registered_tasks_is_exactly_the_seven():
         "blip_vqa",
         "seq2seq",
         "nli",
+        "causal_lm",
     }
 
 
