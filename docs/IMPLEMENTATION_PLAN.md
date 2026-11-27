@@ -140,10 +140,23 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Ghi chú thiết kế**: dùng `requests` (đã có dependency) thay vì `httpx`; thêm `retry.py` (RateLimiter + RetryBackend), `fallback.py` (FallbackBackend) và `__main__.py` (CLI). `api_key_env` nay nhận danh sách qua `api_key_envs` → client xoay vòng key khi provider trả 401/429. `BackendError` mang `status_code`; lỗi 429/5xx → `RetryableBackendError` (retry), 4xx khác → `BackendError` (không retry).
 - **Ghi chú tên model**: tên model cũ trong design đã hết hạn — Groq không còn `llama-3.3-70b-versatile`, NIM trả HTTP 410 cho `meta/llama-3.3-70b-instruct`. Đã cập nhật `configs/default.yaml` và `configs/profiles/api.yaml` theo danh sách model hiện hành (đọc 2026-11-27).
 
-### [ ] T2.4 Backend hf_local (Qwen)
-- **Files**: `src/artrag/llm/hf_local.py`, loader `causal_lm` (bitsandbytes 4-bit).
+### [x] T2.4 Backend hf_local (Qwen) (2026-11-27)
+- **Files**: `src/artrag/llm/hf_local.py`, `src/artrag/models/loaders.py` (loader `causal_lm`), `src/artrag/llm/__init__.py`, `src/artrag/llm/__main__.py`, `src/artrag/models/{inference,smoke}.py`, `tests/test_llm_hf_local.py`.
+- **Deps**: thêm `bitsandbytes>=0.45`.
 - **Verify** (local): `uv run python -m artrag.llm --backend hf_local --model qwen3b --prompt "Thủ đô của Việt Nam là gì?"` → câu trả lời tiếng Việt, in VRAM và tokens/giây.
 - **Nếu lỗi bitsandbytes**: đổi sang `qwen1_5b` fp16, ghi vào `profiles/local.yaml` và vào §10 của design.
+- **Kết quả 2026-11-27 (verify độc lập bằng subagent)**:
+  - `uv run pytest -q` → **361 passed** (337 cũ + 24 mới trong `tests/test_llm_hf_local.py`).
+  - Lệnh verify → `Thủ đô của Việt Nam là Hà Nội.` · `device=cuda | dtype=fp16 | quant=4bit | vram_mb=1960.0 | tokens_per_s=1.81–3.57`.
+  - `uv run python -m artrag.registry --smoke qwen3b` → OK, sinh "The capital of Vietnam is Hanoi."
+  - **bitsandbytes 0.50.2 chạy tốt trên Windows + GTX 1650** → **không cần** đường lùi `qwen1_5b` fp16. Đường lùi vẫn được giữ trong `configs/profiles/local.yaml` và đã kiểm chạy thành công (cuda/fp16, 2 945 MB VRAM, cùng câu trả lời đúng).
+- **Ghi chú thiết kế**:
+  - Backend local **không** bọc `RetryBackend` (chỉ `CachedBackend`) — lỗi cục bộ không hết khi thử lại mà mỗi lần thử lại tốn hàng chục giây nạp model. Xem `LOCAL_BACKENDS` trong `src/artrag/llm/__init__.py`.
+  - Lượng tử hoá 4-bit (NF4) dùng `device_map={"": device}` (không `device_map="auto"` — registry là nguồn sự thật duy nhất về thiết bị) và **bắt buộc phải trên GPU**; loader ném `ModelLoadError` nếu registry chọn CPU.
+  - Greedy (`temperature = 0`) phải xoá `temperature`/`top_p`/`top_k` khỏi tham số sinh, nếu không transformers cảnh báo xung đột với `do_sample=False`.
+  - Thứ tự ưu tiên tên model: `llm.model` → `backends.hf_local.model` → `qwen3b`. `llm.model` ưu tiên vì profile ghi đè khoá này.
+  - Thêm `dtype: fp16` cho `qwen3b` trong `configs/models.yaml` (thiếu thì registry ép `fp32` và báo sai dtype).
+  - `qwen3b` 4-bit tiết kiệm hơn `qwen1_5b` fp16 gần 1 GB VRAM (1 960 vs 2 945 MB) → giữ `qwen3b` làm mặc định profile `local`.
 
 ### [ ] T2.5 Backend flan_t5 + bảo vệ citation khi dịch
 - **Files**: `src/artrag/llm/flan_t5.py`, `src/artrag/pipeline/translate.py` (vi2en/en2vi, cache, placeholder), `tests/test_translate_placeholder.py`.

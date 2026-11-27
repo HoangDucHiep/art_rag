@@ -476,6 +476,8 @@ Gợi ý theo profile:
 | text_embed | sbert | cpu | fp32 | – (RAM) | 1 150 | ~700 | dim 1024 |
 | vi2en | seq2seq | cpu | fp32 | – (RAM) | 900 | ~1 500 | "Xin chào" → "Good afternoon, sir." |
 | en2vi | seq2seq | cpu | fp32 | – (RAM) | 900 | ~3 400 | "Hello" → "Xin chào" |
+| qwen3b (4-bit) | causal_lm | cuda | 4bit | 1 960 | 2 400 | ~5 000 | "Thủ đô của Việt Nam là Hà Nội." |
+| qwen1_5b (fp16) | causal_lm | cuda | fp16 | 2 945 | 3 300 | ~5 100 | "Thủ đô của Việt Nam là Hà Nội." |
 
 Kết luận cho máy local:
 - `nli` chạy **fp16** (đo được 539 MB thay vì 1 065 MB khi fp32) và nhãn dự đoán
@@ -485,6 +487,7 @@ Kết luận cho máy local:
   không dư khi đang giữ `clip` pinned.
 - Thời gian **nạp** phụ thuộc cache HuggingFace: lần đầu tải checkpoint từ mạng
   có thể mất ~30 s/model, các lần sau dùng cache nên chỉ vài giây.
+- Số đo `qwen3b`/`qwen1_5b` đo ở T2.4 (xem mục "Cài đặt T2.4" trong §6.3).
 
 ### 6.3 Backend LLM
 ```python
@@ -509,6 +512,45 @@ class LLMBackend(Protocol):
 - Lỗi HTTP 429/5xx/408/425 → `RetryableBackendError` (có `retry_after` từ header `Retry-After`); lỗi 4xx khác → `BackendError` (không retry). `BackendError` mang `status_code` để lớp trên quyết định có xoay key hay không.
 - `llm.timeout_s`, `llm.max_retries`, `llm.backoff_s`, `llm.cache_dir` là tham số cấu hình; cache nằm ở `data/cache/llm` (§6.4).
 - `python -m artrag.llm --backend groq|nim --prompt "…"` là CLI kiểm tra nhanh (in latency, `cached`, số token).
+
+**Cài đặt T2.4 (2026-11-27)** — backend `hf_local` (module `src/artrag/llm/hf_local.py`):
+- Backend `hf_local` sinh câu trả lời bằng model **causal LM** lấy từ `ModelRegistry`
+  (task `causal_lm`, loader mới trong `src/artrag/models/loaders.py`).
+- **Nạp lazy**: `get_backend()` không nạp model, chỉ nạp ở lần `generate()` đầu
+  tiên -> dựng backend rất nhanh và không tốn VRAM nếu không hỏi gì.
+- **Không retry**: backend local **chỉ** được bọc `CachedBackend`, không bọc
+  `RetryBackend` (xem `LOCAL_BACKENDS` trong `src/artrag/llm/__init__.py`). Lý do:
+  lỗi cục bộ (OOM, thiếu bitsandbytes) không hết khi thử lại, mà mỗi lần thử lại
+  tốn hàng chục giây nạp model. Backend API vẫn retry như cũ.
+- Prompt dựng bằng `apply_chat_template` của model (Qwen2.5-Instruct có sẵn);
+  model không có template thì lùi về định dạng phẳng `system: … / user: … / assistant:`.
+- Số token đếm **chính xác** bằng tokenizer của model (không dùng heuristic
+  ~4 ký tự/token như backend API). `LLMResult.raw` chứa `device`, `dtype`,
+  `quant`, `vram_mb`, `load_ms`, `tokens_per_s`.
+- Lượng tử hoá 4-bit (NF4) qua `bitsandbytes`: `device_map={"": device}` (không
+  dùng `device_map="auto"` — registry là nguồn sự thật duy nhất về thiết bị), và
+  **bắt buộc phải trên GPU** (bitsandbytes không có backend CPU cho 4-bit) ->
+  loader ném `ModelLoadError` nếu registry chọn CPU.
+- Tên model lấy theo thứ tự `llm.model` -> `backends.hf_local.model` -> `qwen3b`.
+  `llm.model` ưu tiên vì profile ghi đè khoá này (đổi profile là đổi model).
+- Greedy (`temperature = 0`) phải xoá `temperature`/`top_p`/`top_k` khỏi tham số
+  sinh, nếu không transformers cảnh báo xung đột với `do_sample=False`.
+
+**Số đo thực tế trên máy local (GTX 1650 4GB, T2.4)**:
+
+| model | cách nạp | thiết bị | dtype | VRAM thực đo (MB) | est_vram_mb | tokens/giây | kết quả thử |
+|---|---|---|---|---|---|---|---|
+| qwen3b | 4-bit (bitsandbytes NF4) | cuda | fp16 | 1 960 | 2 400 | ~2–3,5 | "Thủ đô của Việt Nam là Hà Nội." |
+| qwen1_5b | fp16 | cuda | fp16 | 2 945 | 3 300 | ~2,2 | "Thủ đô của Việt Nam là Hà Nội." |
+
+Kết luận:
+- **bitsandbytes 0.50.2 chạy tốt trên Windows + GTX 1650** -> **không cần** dùng
+  đường lùi `qwen1_5b` fp16. Đường lùi vẫn được giữ trong
+  `configs/profiles/local.yaml` và đã kiểm chạy thành công.
+- Nạp 4-bit lần đầu chậm (tải checkpoint ~5 phút, nạp ~30–60 s); các lần sau
+  dùng cache HuggingFace nên nạp ~10–20 s.
+- `qwen3b` 4-bit **tiết kiệm hơn** `qwen1_5b` fp16 gần 1 GB VRAM (1 960 vs
+  2 945 MB) -> nên giữ `qwen3b` làm mặc định của profile `local`.
 
 ### 6.4 Các tầng cache
 | Cache | Nơi lưu | Khóa | Vô hiệu hóa khi |
@@ -710,7 +752,7 @@ art_rag/
 | Rủi ro | Phương án lùi |
 |---|---|
 | 4GB VRAM không đủ chạy Qwen-3B 4-bit cùng BLIP | Dùng registry LRU và đưa BGE-M3/translator sang CPU. Nếu vẫn không đủ thì lần lượt chuyển sang `qwen1_5b`, profile `colab`/`kaggle` (Gradio `--share`), rồi profile `api` (Groq/NIM) |
-| bitsandbytes lỗi trên Windows | Dùng `qwen1_5b` fp16, hoặc GGUF qua llama-cpp-python (thêm loader), hoặc API |
+| bitsandbytes lỗi trên Windows | **Đã kiểm chứng 2026-11-27: bitsandbytes 0.50.2 chạy tốt trên Windows + GTX 1650** (4-bit NF4, `qwen3b` 1 960 MB VRAM). Nếu máy khác vẫn lỗi -> dùng `qwen1_5b` fp16 (đã có trong `configs/profiles/local.yaml`, đo được 2 945 MB), hoặc GGUF qua llama-cpp-python (thêm loader), hoặc API |
 | API miễn phí bị rate limit hoặc đổi model | Dùng cache và retry. Ghi model và ngày chạy vào kết quả, đồng thời luôn giữ một backend local để chạy được |
 | CLIP yếu với tranh Á Đông và câu hỏi metadata | Nhánh BGE-M3 và trọng số theo QType bù lại. Báo cáo phân tích theo department |
 | Dịch máy làm hỏng tên riêng | BGE-M3 dùng câu hỏi gốc; chỉ CLIP/ITM dùng bản dịch. Tiêu đề trong ngoặc kép được giữ nguyên khi dịch |
