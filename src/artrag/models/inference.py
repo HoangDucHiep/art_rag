@@ -116,21 +116,29 @@ def caption(handle: ModelHandle, image: Any, **gen: Any) -> str:
     return handle.processor.decode(output[0], skip_special_tokens=True).strip()
 
 
-def vqa(handle: ModelHandle, image: Any, question: str) -> str:
+def vqa(handle: ModelHandle, image: Any, question: str, **gen: Any) -> str:
     """Trả lời câu hỏi về ảnh bằng BLIP-VQA.
 
     `BlipForQuestionAnswering.generate` bắt buộc có `input_ids` (câu hỏi đã
-    tokenize) nên ta gọi `forward` trước để lấy `input_ids` rồi mới generate.
+    tokenize) nên ta gọi `generate` với `input_ids` + `pixel_values` tường minh.
+
+    `max_new_tokens` được đặt tường minh, nếu không transformers sẽ cảnh báo và
+    dùng mặc định `max_length=20` (không ổn định giữa các phiên bản).
     """
     _require(handle, "vqa", "blip_vqa")
     import torch  # noqa: PLC0415
 
+    defaults: dict[str, Any] = {"max_new_tokens": 20}
+    defaults.update(gen)
     with torch.no_grad():
         inputs = handle.processor(
             images=image, text=question, return_tensors="pt", truncation=True
         ).to(handle.device)
-        input_ids = inputs["input_ids"]
-        output = handle.model.generate(input_ids=input_ids, pixel_values=inputs["pixel_values"])
+        output = handle.model.generate(
+            input_ids=inputs["input_ids"],
+            pixel_values=inputs["pixel_values"],
+            **defaults,
+        )
     return handle.processor.decode(output[0], skip_special_tokens=True).strip()
 
 

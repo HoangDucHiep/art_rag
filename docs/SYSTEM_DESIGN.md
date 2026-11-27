@@ -466,15 +466,16 @@ Gợi ý theo profile:
 
 Đo bằng `uv run python -m artrag.registry --smoke <model>` (fp16 trên cuda, fp32 trên CPU):
 
-| model | task | thiết bị | dtype | VRAM thực đo (MB) | est_vram_mb | tải (ms) | suy luận (ms) |
+| model | task | thiết bị | dtype | VRAM thực đo (MB) | est_vram_mb | suy luận (ms) | kết quả thử |
 |---|---|---|---|---|---|---|---|
-| clip | clip | cuda | fp16 | 296 | 350 | ~9 000 | ~900 |
-| blip_itm | blip_itm | cuda | fp16 | 444 | 900 | ~7 000 | ~700 |
-| blip_cap | blip_cap | cuda | fp16 | 489 | 950 | ~31 000 | ~5 000 |
-| blip_vqa | blip_vqa | cuda | fp16 | 761 | 800 | ~4 000 | ~750 |
-| nli | nli | cuda | fp16 | 539 | 550 | ~6 500 | ~550 |
-| text_embed | sbert | cpu | fp32 | – (RAM) | 1 150 | ~13 000 | ~700 |
-| vi2en | seq2seq | cpu | fp32 | – (RAM) | 900 | ~4 000 | ~1 500 |
+| clip | clip | cuda | fp16 | 296 | 350 | ~900 | dim 512, cos 0.287 |
+| blip_itm | blip_itm | cuda | fp16 | 443 | 900 | ~670 | itm_score 0.684 |
+| blip_cap | blip_cap | cuda | fp16 | 489 | 950 | ~5 000 | "a painting of two men rowing on a lake" |
+| blip_vqa | blip_vqa | cuda | fp16 | 761 | 800 | ~820 | "4" |
+| nli | nli | cuda | fp16 | 539 | 550 | ~300 | entailment |
+| text_embed | sbert | cpu | fp32 | – (RAM) | 1 150 | ~700 | dim 1024 |
+| vi2en | seq2seq | cpu | fp32 | – (RAM) | 900 | ~1 500 | "Xin chào" → "Good afternoon, sir." |
+| en2vi | seq2seq | cpu | fp32 | – (RAM) | 900 | ~3 400 | "Hello" → "Xin chào" |
 
 Kết luận cho máy local:
 - `nli` chạy **fp16** (đo được 539 MB thay vì 1 065 MB khi fp32) và nhãn dự đoán
@@ -482,8 +483,8 @@ Kết luận cho máy local:
 - `blip_vqa` thực đo 761 MB, cao hơn est 750 — nâng lên 800.
 - `text_embed` (BGE-M3) và translator phải ở CPU (profile `local`), vì VRAM 4GB
   không dư khi đang giữ `clip` pinned.
-- `blip_cap` nạp chậm nhất (~31 s) vì tải checkpoint lần đầu từ mạng; các lần
-  sau dùng cache HF nên nhanh hơn nhiều.
+- Thời gian **nạp** phụ thuộc cache HuggingFace: lần đầu tải checkpoint từ mạng
+  có thể mất ~30 s/model, các lần sau dùng cache nên chỉ vài giây.
 
 ### 6.3 Backend LLM
 ```python
