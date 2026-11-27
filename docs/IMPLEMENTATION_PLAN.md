@@ -129,13 +129,16 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Ghi chú thiết kế**: thêm `src_lang`/`tgt_lang` vào `configs/models.yaml` cho model dịch vinai — MBart **bắt buộc** set `src_lang` cho tokenizer và `decoder_start_token_id` = token ngôn ngữ đích khi generate, nếu không sinh ra chuỗi lặp vô nghĩa ("Xin Xin Xin ..."). Số đo thực tế ghi ở §6.2.1 của SYSTEM_DESIGN.
 - **Profile `local`**: `text_embed` (BGE-M3) và `vi2en`/`en2vi` giữ ở CPU; `nli` chuyển sang fp16 (539 MB thay vì 1 065 MB, nhãn dự đoán không đổi); `est_vram_mb` của `blip_vqa` nâng 750 → 800 theo số đo.
 
-### [ ] T2.3 Interface LLM + cache + retry + openai_compat (§6.3)
+### [x] T2.3 Interface LLM + cache + retry + openai_compat (§6.3) (2026-11-27)
 - **Files**: `src/artrag/llm/{base.py,cache.py,openai_compat.py,__init__.py}` (`get_backend(cfg)`), `tests/test_llm_cache.py`.
 - **Deps**: `httpx` (hoặc `openai`).
 - **Nội dung**: `LLMResult`; `CachedBackend`, `RetryBackend` (backoff, rpm limiter); client openai-compat chung cho Groq/NIM.
 - **Verify**:
   - `uv run pytest tests/test_llm_cache.py -q` (mock HTTP: gọi lần 2 thì `cached=True`; 429 thì retry);
   - lời gọi thật (cần key trong `.env`): `uv run python -m artrag.llm --backend groq --prompt "Xin chào"` → có câu trả lời, in latency; chạy lại thì in `cached`.
+- **Kết quả 2026-11-27 (verify độc lập bằng subagent)**: `tests/test_llm_cache.py` → **23 passed**; toàn bộ suite → **337 passed** (314 cũ + 23 mới). Gọi thật: Groq (`qwen/qwen3.8-27b`) trả lời tiếng Việt, lần 2 in `cached=True`; NVIDIA NIM (`nvidia/nemotron-3.5-bolt-e4b`) trả lời sau ~2,3 s. Chuỗi fallback `groq -> nim` hoạt động: khi ép `base_url` của groq thành URL sai, nim tiếp quản.
+- **Ghi chú thiết kế**: dùng `requests` (đã có dependency) thay vì `httpx`; thêm `retry.py` (RateLimiter + RetryBackend), `fallback.py` (FallbackBackend) và `__main__.py` (CLI). `api_key_env` nay nhận danh sách qua `api_key_envs` → client xoay vòng key khi provider trả 401/429. `BackendError` mang `status_code`; lỗi 429/5xx → `RetryableBackendError` (retry), 4xx khác → `BackendError` (không retry).
+- **Ghi chú tên model**: tên model cũ trong design đã hết hạn — Groq không còn `llama-3.3-70b-versatile`, NIM trả HTTP 410 cho `meta/llama-3.3-70b-instruct`. Đã cập nhật `configs/default.yaml` và `configs/profiles/api.yaml` theo danh sách model hiện hành (đọc 2026-11-27).
 
 ### [ ] T2.4 Backend hf_local (Qwen)
 - **Files**: `src/artrag/llm/hf_local.py`, loader `causal_lm` (bitsandbytes 4-bit).

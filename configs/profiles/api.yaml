@@ -3,7 +3,7 @@ vram_budget_mb: 3600
 
 llm:
   backend: groq
-  model: llama-3.3-70b-versatile
+  model: qwen/qwen3.8-27b
   fallback: nim
 
 context:

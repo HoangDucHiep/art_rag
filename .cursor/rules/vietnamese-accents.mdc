@@ -1,8 +1,6 @@
 ---
-trigger: always_on
-description: Enforce English identifiers and properly accented Vietnamese for all Vietnamese text.
+alwaysApply: true
 ---
-
 # Language Rules
 
 1. **Identifiers** (functions, classes, variables, constants, parameters, filenames/modules): **always English**, never Vietnamese.

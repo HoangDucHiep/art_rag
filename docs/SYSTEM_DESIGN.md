@@ -503,6 +503,13 @@ class LLMBackend(Protocol):
 - Lớp bọc chung `RetryBackend`: retry khi gặp 429/5xx/timeout, exponential backoff 1-2-4-8-16 giây, tối đa 5 lần, kèm rate limiter theo `rpm_limit`.
 - Nhờ cache, chạy lại eval không tốn quota API và kết quả tái lập được.
 
+**Cài đặt T2.3 (2026-11-27)** — module `src/artrag/llm/`:
+- Chuỗi bọc: `FallbackBackend([ RetryBackend( CachedBackend( OpenAICompatBackend ) ), ... ])`. Cache bên trong retry để một lần gọi bị lỗi tạm thời không ghi rác vào cache; retry bên trong fallback để backend dự phòng cũng được retry.
+- `api_key_env` nhận **chuỗi** hoặc **danh sách chuỗi** (thêm `api_key_envs`). Khi provider trả 401/429, client xoay vòng sang key kế tiếp (vòng tròn) trước khi ném lỗi — cho phép khai báo nhiều key cho cùng provider.
+- Lỗi HTTP 429/5xx/408/425 → `RetryableBackendError` (có `retry_after` từ header `Retry-After`); lỗi 4xx khác → `BackendError` (không retry). `BackendError` mang `status_code` để lớp trên quyết định có xoay key hay không.
+- `llm.timeout_s`, `llm.max_retries`, `llm.backoff_s`, `llm.cache_dir` là tham số cấu hình; cache nằm ở `data/cache/llm` (§6.4).
+- `python -m artrag.llm --backend groq|nim --prompt "…"` là CLI kiểm tra nhanh (in latency, `cached`, số token).
+
 ### 6.4 Các tầng cache
 | Cache | Nơi lưu | Khóa | Vô hiệu hóa khi |
 |---|---|---|---|

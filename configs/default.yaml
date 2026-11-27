@@ -119,17 +119,31 @@ llm:
     max_new_tokens: 256
     temperature: 0.0
   fallback: null
+  # --- Tham số hạ tầng gọi API (T2.3) ---
+  timeout_s: 60
+  max_retries: 5
+  backoff_s: 1.0
+  # Tên thư mục cache (đặt dưới `paths.data_dir/cache/`)
+  cache_dir: llm
 
 backends:
   groq:
     type: openai_compat
     base_url: https://api.groq.com/openai/v1
-    model: llama-3.3-70b-versatile
-    api_key_env: GROQ_API_KEY
+    # Danh sách model hiện hành của Groq (đọc 2026-11-27):
+    # openai/gpt-oss-120b · openai/gpt-oss-20b · qwen/qwen3.8-27b · allam-2-7b ...
+    model: qwen/qwen3.8-27b
+    # Nhiều key cho cùng provider: xoay vòng khi provider trả 429/401.
+    api_key_envs: [GROQ_API_KEY, SECOND_GROQ_API_KEY]
     rpm_limit: 30
   nim:
     type: openai_compat
     base_url: https://integrate.api.nvidia.com/v1
-    model: meta/llama-3.3-70b-instruct
-    api_key_env: NVIDIA_API_KEY
+    # Danh sách model hiện hành của NVIDIA NIM (đọc 2026-11-27):
+    # nvidia/nemotron-3.5-bolt-e4b · mistralai/mistral-large-4-1t-a52b
+    # · google/gemma-3-12b-it · z-ai/glm-5.3-flash · nvidia/nemotron-3-ultra-550b-a55b
+    # Lưu ý: model mistral-large trả `content=null` khi hết `max_tokens` vì còn
+    # phần `reasoning_content` -> nên dùng nemotron cho backend dự phòng.
+    model: nvidia/nemotron-3.5-bolt-e4b
+    api_key_envs: [NVIDIA_API_KEY, SECOND_NVIDIA_API_KEY]
     rpm_limit: 40
