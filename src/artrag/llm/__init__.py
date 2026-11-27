@@ -14,6 +14,7 @@ from artrag.errors import BackendError
 from artrag.llm.base import LLMBackend, LLMResult, count_message_tokens, estimate_tokens
 from artrag.llm.cache import CachedBackend, cache_key
 from artrag.llm.fallback import FallbackBackend
+from artrag.llm.flan_t5 import FlanT5Backend, build_flan_t5
 from artrag.llm.hf_local import HFLocalBackend, build_hf_local
 from artrag.llm.openai_compat import (
     OpenAICompatBackend,
@@ -23,11 +24,11 @@ from artrag.llm.openai_compat import (
 )
 from artrag.llm.retry import RateLimiter, RetryBackend
 
-#: Các backend chưa được hỗ trợ ở T2.3 (sẽ bổ sung ở T2.4/T2.5).
-PENDING_BACKENDS = ("flan_t5",)
+#: Các backend chưa được hỗ trợ (T2.3). T2.4 đã thêm `hf_local`, T2.5 thêm `flan_t5`.
+PENDING_BACKENDS: tuple[str, ...] = ()
 
 #: Backend chạy local: lỗi cục bộ không hết khi thử lại nên **không** retry.
-LOCAL_BACKENDS = ("hf_local",)
+LOCAL_BACKENDS = ("hf_local", "flan_t5")
 
 
 def load_env() -> None:
@@ -83,7 +84,12 @@ def _build_single(name: str, cfg: Any) -> LLMBackend:
 
     if backend_type == "hf_local" or (node is None and name in LOCAL_BACKENDS):
         # Model nạp lazy qua registry nên dựng backend rất nhanh.
+        if backend_type == "flan_t5" or (node is None and name == "flan_t5"):
+            return build_flan_t5(cfg, node, name=name)
         return build_hf_local(cfg, node, name=name)
+
+    if backend_type == "flan_t5":
+        return build_flan_t5(cfg, node, name=name)
 
     if backend_type == "openai_compat":
         if node is None:
@@ -103,8 +109,8 @@ def _build_single(name: str, cfg: Any) -> LLMBackend:
 
     if backend_type in PENDING_BACKENDS:
         raise BackendError(
-            f"Backend {backend_type!r} chưa được hỗ trợ ở T2.3.",
-            hint="hf_local sẽ có ở T2.4, flan_t5 ở T2.5.",
+            f"Backend {backend_type!r} chưa được hỗ trợ.",
+            hint="xem `backends:` trong configs/default.yaml để biết backend nào có sẵn.",
         )
 
     raise BackendError(
@@ -176,6 +182,7 @@ def get_backend(
 __all__ = [
     "CachedBackend",
     "FallbackBackend",
+    "FlanT5Backend",
     "HFLocalBackend",
     "LLMBackend",
     "LLMResult",
@@ -184,6 +191,7 @@ __all__ = [
     "PENDING_BACKENDS",
     "RateLimiter",
     "RetryBackend",
+    "build_flan_t5",
     "build_hf_local",
     "build_openai_compat",
     "cache_key",

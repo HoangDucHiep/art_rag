@@ -396,8 +396,8 @@ def test_openai_compat_still_wrapped_in_retry():
     assert "RetryBackend" in layers
 
 
-def test_flan_t5_still_reports_pending():
-    """T2.5 chưa làm -> `flan_t5` phải báo chưa hỗ trợ."""
+def test_flan_t5_backend_is_supported():
+    """T2.5 đã làm -> `flan_t5` phải dựng được backend."""
     cfg = Config(
         {
             "llm": {"backend": "flan_t5"},
@@ -405,10 +405,9 @@ def test_flan_t5_still_reports_pending():
         }
     )
 
-    with pytest.raises(BackendError) as exc:
-        get_backend(cfg, use_cache=False)
+    backend = get_backend(cfg, use_cache=False)
 
-    assert "flan_t5" in str(exc.value)
+    assert type(backend).__name__ == "FlanT5Backend"
 
 
 # ---------------------------------------------------------------------------

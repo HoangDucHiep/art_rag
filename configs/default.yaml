@@ -132,6 +132,22 @@ backends:
   hf_local:
     type: hf_local
     model: qwen3b
+  # Backend FLAN-T5: sinh câu trả lời bằng FLAN-T5 (EN) rồi dịch EN->VI.
+  # Model lấy từ registry (task `seq2seq`); nạp lazy -> không tốn VRAM nếu không hỏi.
+  flan_t5:
+    type: flan_t5
+    model: flan_t5
+    en2vi_model: en2vi
+    vi2en_model: vi2en
+    # Chỉ dẫn lượt 1 (sinh câu trả lời) và lượt 2 (chọn nhãn bằng chứng).
+    # Lượt 1 KHÔNG được nhắc trích nhãn: FLAN-T5-base sẽ chỉ phát nhãn
+    # (`[IMG-01]. [IMG-01]`) thay vì trả lời (đo thực tế 8/15 mẫu rỗng).
+    # Lượt 2 là cần thiết vì model không tự phát lại nhãn `[IMG-xx]`.
+    instruction: >-
+      Answer the question in a short sentence, using only the evidence.
+    label_instruction: >-
+      Which evidence label does this answer come from?
+      Answer with the label only, for example [IMG-01].
   groq:
     type: openai_compat
     base_url: https://api.groq.com/openai/v1

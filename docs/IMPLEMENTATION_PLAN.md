@@ -158,9 +158,16 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
   - Thêm `dtype: fp16` cho `qwen3b` trong `configs/models.yaml` (thiếu thì registry ép `fp32` và báo sai dtype).
   - `qwen3b` 4-bit tiết kiệm hơn `qwen1_5b` fp16 gần 1 GB VRAM (1 960 vs 2 945 MB) → giữ `qwen3b` làm mặc định profile `local`.
 
-### [ ] T2.5 Backend flan_t5 + bảo vệ citation khi dịch
+### [x] T2.5 Backend flan_t5 + bảo vệ citation khi dịch (2026-11-27)
 - **Files**: `src/artrag/llm/flan_t5.py`, `src/artrag/pipeline/translate.py` (vi2en/en2vi, cache, placeholder), `tests/test_translate_placeholder.py`.
 - **Verify**: `uv run pytest tests/test_translate_placeholder.py -q` (dùng dịch giả: `[IMG-01]` được giữ nguyên); smoke `uv run python -m artrag.llm --backend flan_t5 --prompt "..."`.
+- **Kết quả 2026-11-27 (verify độc lập bằng subagent)**: `tests/test_translate_placeholder.py` → **36 passed**; toàn bộ suite → **395 passed**. Smoke: `flan_t5` nạp cuda/fp32, VRAM đo **947 MB**, sinh ~1,7–1,9 token/giây. Câu trả lời tiếng Việt **không rỗng**, nhãn `[IMG-01]` sống sót qua sinh → chọn nhãn → dịch (`labels=["[IMG-01]"]`). Cache đĩa hoạt động: `cached=True` (latency 0 ms), `data/cache/translate` có 10 entry.
+- **Ghi chú thiết kế (2 điểm quan trọng)**:
+  - **Cắt output của model encoder-decoder**: FLAN-T5 là encoder-decoder nên output có dạng `[decoder_start_token] + token_sinh_moi`, **không** phải `prompt + token_sinh_moi`. Phải cắt từ vị trí 1 — cắt theo độ dài prompt làm mất token sinh đầu tiên (prompt ngắn -> chuỗi rỗng).
+  - **Cơ chế hai lượt**: FLAN-T5-base **không tự phát lại** nhãn `[IMG-xx]` (đo thực tế 0/11 mẫu prompt trả lời có nhãn). Vì vậy lượt 1 sinh câu trả lời, lượt 2 hỏi riêng "câu trả lời này đến từ nhãn bằng chứng nào" rồi chèn nhãn vào (chỉ giữ nhãn có thật trong context, tránh bịa citation).
+  - **Chỉ dẫn lượt 1 KHÔNG được nhắc trích nhãn**: câu "cite the evidence labels exactly as written" làm model chỉ phát nhãn (`[IMG-01]. [IMG-01]`) — 8/15 mẫu rỗng nội dung. Chỉ dẫn dùng *"Answer the question in a short sentence, using only the evidence."* -> 15/15 câu hỏi có nội dung đúng. Prompt phải kết thúc bằng `Answer:`.
+  - **Bảo vệ citation khi dịch**: văn bản được chia đoạn theo nhãn `[IMG-xx]`; chỉ đoạn thuần mới đưa qua máy dịch, đoạn chứa nhãn giữ nguyên -> nhãn không bao giờ bị máy dịch làm hỏng. Bất biến `join_segments(split_segments(t)) == t`.
+  - **Hạn chế của FLAN-T5-base**: không từ chối được, với bằng chứng thiếu nó **bịa** (vd. đấu giá "$500.000"). Logic abstain **không** được đặt trong prompt mà phải ở tầng quy tắc của pipeline (§5.9).
 
 ---
 

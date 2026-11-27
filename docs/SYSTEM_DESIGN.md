@@ -500,7 +500,7 @@ class LLMBackend(Protocol):
 |---|---|
 | `hf_local` | Model `causal_lm` lấy từ registry (Qwen2.5-3B 4-bit qua bitsandbytes), dùng `apply_chat_template`. Nếu bitsandbytes lỗi trên Windows thì dùng `qwen1_5b` fp16 |
 | `openai_compat` | Một client cho **Groq** (`https://api.groq.com/openai/v1`) và **NVIDIA NIM** (`https://integrate.api.nvidia.com/v1`). Config gồm `base_url`, `model`, `api_key_env`, `rpm_limit`. Tên model lấy theo danh sách hiện hành của provider, ghi vào kết quả cùng ngày chạy |
-| `flan_t5` | Pipeline EN: context EN + câu hỏi đã dịch sang EN → FLAN-T5 → dịch EN→VI. Trước khi dịch, citation được thay bằng placeholder `⟦1⟧` rồi khôi phục sau, để citation không bị máy dịch làm hỏng |
+| `flan_t5` | Pipeline EN: câu hỏi VI→EN → FLAN-T5 → dịch EN→VI. Cơ chế **hai lượt**: lượt 1 sinh câu trả lời, lượt 2 chọn nhãn bằng chứng `[IMG-xx]` và chèn vào câu trả lời. Trước khi dịch, văn bản được **chia đoạn theo nhãn**: đoạn thuần mới được dịch, đoạn chứa nhãn được giữ nguyên -> citation không bị máy dịch làm hỏng |
 
 - Lớp bọc chung `CachedBackend`: cache bằng diskcache với key `sha256(backend, model, messages, gen)`. Sinh greedy nên cache luôn hợp lệ.
 - Lớp bọc chung `RetryBackend`: retry khi gặp 429/5xx/timeout, exponential backoff 1-2-4-8-16 giây, tối đa 5 lần, kèm rate limiter theo `rpm_limit`.
@@ -552,6 +552,48 @@ Kết luận:
 - `qwen3b` 4-bit **tiết kiệm hơn** `qwen1_5b` fp16 gần 1 GB VRAM (1 960 vs
   2 945 MB) -> nên giữ `qwen3b` làm mặc định của profile `local`.
 
+**Cài đặt T2.5 (2026-11-27)** — backend `flan_t5` (module `src/artrag/llm/flan_t5.py`)
++ module dịch `src/artrag/pipeline/translate.py`:
+- Backend `flan_t5` chạy pipeline **EN**: câu hỏi VI -> dịch EN -> FLAN-T5 sinh
+  câu trả lời EN -> dịch EN->VI. Model `flan_t5` (`google/flan-t5-base`) và hai
+  model dịch (`vi2en`, `en2vi`) đều lấy từ `ModelRegistry` (task `seq2seq`),
+  **nạp lazy** -> dựng backend không tốn VRAM.
+- **Không retry**: như `hf_local`, chỉ được bọc `CachedBackend` (xem
+  `LOCAL_BACKENDS` trong `src/artrag/llm/__init__.py`).
+- **Cơ chế hai lượt** (đo thực tế, xem bảng dưới):
+  - **Lượt 1**: sinh câu trả lời (tiếng Anh). Chỉ dẫn lượt 1 **không được** nhắc
+    trích nhãn: câu "cite the evidence labels exactly as written" làm
+    FLAN-T5-base **chỉ phát nhãn** (`[IMG-01]. [IMG-01]`) — 8/15 mẫu rỗng nội dung.
+    Chỉ dẫn dùng: *"Answer the question in a short sentence, using only the
+    evidence."* -> **15/15** câu hỏi có nội dung đúng.
+  - **Lượt 2**: hỏi *"Which evidence label does this answer come from? Answer with
+    the label only, for example [IMG-01]."* -> nhãn được **chèn lại** vào cuối
+    câu trả lời. Chỉ giữ nhãn **có thật trong context** để không bịa citation.
+  - Prompt lượt 1 phải kết thúc bằng `Answer:` (mẫu huấn luyện của FLAN-T5).
+- **Bảo vệ citation khi dịch** (`src/artrag/pipeline/translate.py`): văn bản được
+  **chia đoạn theo nhãn** `[IMG-xx]`; **chỉ đoạn thuần** mới đưa qua máy dịch,
+  đoạn chứa nhãn được giữ nguyên -> nhãn citation không bao giờ bị máy dịch làm
+  hỏng. Hàm thuần (`split_segments`, `join_segments`, `protect_citations`,
+  `translate_segments`) **không cần GPU** nên test được nhanh.
+  Bất biến: `join_segments(split_segments(t)) == t`.
+- Cache dịch: `data/cache/translate`, khoá `sha256(model|văn bản)`.
+- **Hạn chế đã biết**: FLAN-T5-base **không từ chối được** — với bằng chứng thiếu
+  nó **bịa** (vd. đấu giá "$500.000"). Vì vậy logic abstain **không** được đặt
+  trong prompt, mà thuộc tầng quy tắc của pipeline (§5.9).
+
+**Số đo thực tế trên máy local (GTX 1650 4GB, T2.5)**:
+
+| model | thiết bị | dtype | VRAM thực đo (MB) | est_vram_mb | tokens/giây | kết quả thử |
+|---|---|---|---|---|---|---|
+| flan_t5 (`google/flan-t5-base`) | cuda | fp32 | 947 | 1 000 | ~1,7–1,9 | "Thomas Eakins [IMG-01]" |
+| vi2en / en2vi (vinai, MBart) | cpu | fp32 | – (RAM) | 900 | – | dịch đúng, giữ nguyên nhãn |
+
+Ghi chú:
+- Latency của một lần hỏi (nạp model xong): sinh câu trả lời ~3–7 s, lượt 2
+  chọn nhãn ~1 s, dịch EN->VI ~0,1–0,3 s (có cache).
+- `flan_t5` chạy fp32 trên GPU (947 MB) — không ép fp16 vì FLAN-T5-base nhỏ và
+  fp32 cho kết quả ổn định hơn trên GPU kiểu GTX 1650.
+
 ### 6.4 Các tầng cache
 | Cache | Nơi lưu | Khóa | Vô hiệu hóa khi |
 |---|---|---|---|
@@ -559,7 +601,7 @@ Kết luận:
 | Ảnh 512px | `images/` | artwork_id | xóa file |
 | Embedding + FAISS | `index/*` | model tag + `kb_hash` | `kb_hash` lệch thì `StaleIndexError` |
 | Caption | `cache/captions-*.parquet` | artwork_id + model + params_hash | đổi params |
-| Dịch | `cache/translate` | text + model | – |
+| Dịch | `cache/translate` | sha256(model + văn bản) | đổi model dịch |
 | VQA | `cache/vqa` | artwork_id + question + model | – |
 | LLM | `cache/llm` | hash prompt + model + params | `--no-cache` |
 | Query embedding (RAM) | `functools.lru_cache` (512) | text + model | khởi động lại |

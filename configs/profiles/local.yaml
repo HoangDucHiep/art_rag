@@ -42,3 +42,6 @@ models:
   qwen1_5b:
     # Đường lùi khi bitsandbytes lỗi trên Windows: fp16 trên GPU, CPU nếu hết VRAM.
     devices: [cuda, cpu]
+  flan_t5:
+    # FLAN-T5-base nhỏ (fp32 ~1 GB) -> vừa GPU; CPU vẫn dùng được (chậm hơn).
+    devices: [cuda, cpu]
