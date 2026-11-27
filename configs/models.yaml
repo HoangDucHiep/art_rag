@@ -11,6 +11,8 @@
 #   quant       : 4bit (chỉ dùng cho causal_lm)
 #   est_vram_mb : ước tính VRAM khi nạp lên cuda — dùng cho ngân sách + LRU
 #   devices     : thứ tự thử thiết bị; "cuda" phải khả dụng mới được dùng
+#   src_lang    : (model MBart) mã ngôn ngữ nguồn, vd. vi_VN
+#   tgt_lang    : (model MBart) mã ngôn ngữ đích, vd. en_XX
 #
 # Profile ghi đè được `devices`, `dtype`, `quant`, `pinned` cho từng model
 # (xem configs/profiles/local.yaml).
@@ -19,10 +21,10 @@ clip:        {task: clip,       hf_id: openai/clip-vit-base-patch32,       dtype
 text_embed:  {task: sbert,      hf_id: BAAI/bge-m3,                         dtype: fp16, est_vram_mb: 1150, devices: [cuda, cpu]}
 blip_itm:    {task: blip_itm,   hf_id: Salesforce/blip-itm-base-coco,       dtype: fp16, est_vram_mb: 900,  devices: [cuda, cpu]}
 blip_cap:    {task: blip_cap,   hf_id: Salesforce/blip-image-captioning-base, dtype: fp16, est_vram_mb: 950, devices: [cuda, cpu]}
-blip_vqa:    {task: blip_vqa,   hf_id: Salesforce/blip-vqa-base,            dtype: fp16, est_vram_mb: 750,  devices: [cuda, cpu]}
-vi2en:       {task: seq2seq,    hf_id: vinai/vinai-translate-vi2en-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda]}
-en2vi:       {task: seq2seq,    hf_id: vinai/vinai-translate-en2vi-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda]}
+blip_vqa:    {task: blip_vqa,   hf_id: Salesforce/blip-vqa-base,            dtype: fp16, est_vram_mb: 800,  devices: [cuda, cpu]}
+vi2en:       {task: seq2seq,    hf_id: vinai/vinai-translate-vi2en-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda], src_lang: vi_VN, tgt_lang: en_XX}
+en2vi:       {task: seq2seq,    hf_id: vinai/vinai-translate-en2vi-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda], src_lang: en_XX, tgt_lang: vi_VN}
 qwen3b:      {task: causal_lm,  hf_id: Qwen/Qwen2.5-3B-Instruct, quant: 4bit, est_vram_mb: 2400, devices: [cuda]}
 qwen1_5b:    {task: causal_lm,  hf_id: Qwen/Qwen2.5-1.5B-Instruct, dtype: fp16, est_vram_mb: 3300, devices: [cuda, cpu]}
 flan_t5:     {task: seq2seq,    hf_id: google/flan-t5-base,                 dtype: fp32, est_vram_mb: 1000, devices: [cuda, cpu]}
-nli:         {task: nli,        hf_id: MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7, est_vram_mb: 600, devices: [cuda, cpu]}
+nli:         {task: nli,        hf_id: MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7, dtype: fp16, est_vram_mb: 550, devices: [cuda, cpu]}

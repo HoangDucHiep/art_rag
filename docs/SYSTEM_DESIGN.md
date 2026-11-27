@@ -430,15 +430,19 @@ clip:        {task: clip,       hf_id: openai/clip-vit-base-patch32,       dtype
 text_embed:  {task: sbert,      hf_id: BAAI/bge-m3,                         dtype: fp16, est_vram_mb: 1150, devices: [cuda, cpu]}
 blip_itm:    {task: blip_itm,   hf_id: Salesforce/blip-itm-base-coco,       dtype: fp16, est_vram_mb: 900,  devices: [cuda, cpu]}
 blip_cap:    {task: blip_cap,   hf_id: Salesforce/blip-image-captioning-base, dtype: fp16, est_vram_mb: 950, devices: [cuda, cpu]}
-blip_vqa:    {task: blip_vqa,   hf_id: Salesforce/blip-vqa-base,            dtype: fp16, est_vram_mb: 750,  devices: [cuda, cpu]}
-vi2en:       {task: seq2seq,    hf_id: vinai/vinai-translate-vi2en-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda]}
-en2vi:       {task: seq2seq,    hf_id: vinai/vinai-translate-en2vi-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda]}
+blip_vqa:    {task: blip_vqa,   hf_id: Salesforce/blip-vqa-base,            dtype: fp16, est_vram_mb: 800,  devices: [cuda, cpu]}
+vi2en:       {task: seq2seq,    hf_id: vinai/vinai-translate-vi2en-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda], src_lang: vi_VN, tgt_lang: en_XX}
+en2vi:       {task: seq2seq,    hf_id: vinai/vinai-translate-en2vi-v2,      dtype: fp16, est_vram_mb: 900,  devices: [cpu, cuda], src_lang: en_XX, tgt_lang: vi_VN}
 qwen3b:      {task: causal_lm,  hf_id: Qwen/Qwen2.5-3B-Instruct, quant: 4bit, est_vram_mb: 2400, devices: [cuda]}
 qwen1_5b:    {task: causal_lm,  hf_id: Qwen/Qwen2.5-1.5B-Instruct, dtype: fp16, est_vram_mb: 3300, devices: [cuda, cpu]}
 flan_t5:     {task: seq2seq,    hf_id: google/flan-t5-base,                 dtype: fp32, est_vram_mb: 1000, devices: [cuda, cpu]}
-nli:         {task: nli,        hf_id: MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7, est_vram_mb: 600, devices: [cuda, cpu]}
+nli:         {task: nli,        hf_id: MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7, dtype: fp16, est_vram_mb: 550, devices: [cuda, cpu]}
 ```
 Profile có thể ghi đè `devices`, `dtype` và `pinned` của từng model.
+
+`src_lang`/`tgt_lang` chỉ dùng cho model dịch kiểu MBart (vinai). Bắt buộc phải
+set `src_lang` cho tokenizer và `decoder_start_token_id` = token ngôn ngữ đích
+khi generate, nếu không model sinh ra chuỗi lặp vô nghĩa ("Xin Xin Xin ...").
 
 API:
 - `registry.get(name) -> ModelHandle`, trả về `(model, processor, device)`.
@@ -457,6 +461,29 @@ Gợi ý theo profile:
 - `local` (4GB): pin `clip`; `text_embed`, `vi2en`, `en2vi` chạy CPU; `blip_itm`, `blip_vqa`, `qwen3b` luân phiên trên GPU.
 - `colab/kaggle`: nạp tất cả lên GPU.
 - `api`: model thị giác chạy local GPU/CPU, LLM gọi qua API.
+
+#### 6.2.1 Số đo thực tế trên máy local (GTX 1650 4GB, T2.2)
+
+Đo bằng `uv run python -m artrag.registry --smoke <model>` (fp16 trên cuda, fp32 trên CPU):
+
+| model | task | thiết bị | dtype | VRAM thực đo (MB) | est_vram_mb | tải (ms) | suy luận (ms) |
+|---|---|---|---|---|---|---|---|
+| clip | clip | cuda | fp16 | 296 | 350 | ~9 000 | ~900 |
+| blip_itm | blip_itm | cuda | fp16 | 444 | 900 | ~7 000 | ~700 |
+| blip_cap | blip_cap | cuda | fp16 | 489 | 950 | ~31 000 | ~5 000 |
+| blip_vqa | blip_vqa | cuda | fp16 | 761 | 800 | ~4 000 | ~750 |
+| nli | nli | cuda | fp16 | 539 | 550 | ~6 500 | ~550 |
+| text_embed | sbert | cpu | fp32 | – (RAM) | 1 150 | ~13 000 | ~700 |
+| vi2en | seq2seq | cpu | fp32 | – (RAM) | 900 | ~4 000 | ~1 500 |
+
+Kết luận cho máy local:
+- `nli` chạy **fp16** (đo được 539 MB thay vì 1 065 MB khi fp32) và nhãn dự đoán
+  không đổi -> `est_vram_mb` đặt là 550.
+- `blip_vqa` thực đo 761 MB, cao hơn est 750 — nâng lên 800.
+- `text_embed` (BGE-M3) và translator phải ở CPU (profile `local`), vì VRAM 4GB
+  không dư khi đang giữ `clip` pinned.
+- `blip_cap` nạp chậm nhất (~31 s) vì tải checkpoint lần đầu từ mạng; các lần
+  sau dùng cache HF nên nhanh hơn nhiều.
 
 ### 6.3 Backend LLM
 ```python

@@ -12,11 +12,17 @@ query:
   translator: vinai
 
 # Ghi đè devices/dtype/pinned của từng model (§6.2).
+#
+# Số đo thực tế trên GTX 1650 4GB (T2.2, xem SYSTEM_DESIGN §6.2.1):
+#   clip 296 MB | blip_itm 444 | blip_cap 489 | blip_vqa 761 | nli 539 (fp16)
+#   -> clip + blip_vqa + nli vừa trong 4GB, nhưng giữ cả 3 cùng lúc thì chật,
+#      nên các model BLIP được để LRU tự giải phóng theo ngân sách 3600 MB.
 models:
   clip:
     pinned: true
     devices: [cuda, cpu]
   text_embed:
+    # BGE-M3 fp32 trên CPU ~2.3 GB RAM; đưa lên cuda sẽ vượt ngân sách 4GB.
     devices: [cpu]
   vi2en:
     devices: [cpu]
@@ -25,6 +31,10 @@ models:
   blip_itm:
     devices: [cuda, cpu]
   blip_vqa:
+    devices: [cuda, cpu]
+  nli:
+    # fp16 đo được 539 MB (fp32 là 1 065 MB) và nhãn dự đoán không đổi.
+    dtype: fp16
     devices: [cuda, cpu]
   qwen3b:
     devices: [cuda, cpu]

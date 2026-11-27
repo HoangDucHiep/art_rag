@@ -21,6 +21,7 @@ nên unit test chạy được với loader giả và device manager giả.
 from __future__ import annotations
 
 import abc
+import argparse
 import threading
 import time
 from dataclasses import dataclass, field
@@ -29,7 +30,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 import yaml
 
-from artrag.config import REPO_ROOT, Config
+from artrag.config import REPO_ROOT, Config, load_config
 from artrag.errors import ModelLoadError
 
 MODELS_YAML = REPO_ROOT / "configs" / "models.yaml"
@@ -96,6 +97,9 @@ class ModelSpec:
     est_vram_mb: int = 0
     devices: tuple[str, ...] = ("cpu",)
     pinned: bool = False
+    #: Ngôn ngữ nguồn/đích cho model dịch kiểu MBart (vd. vi2en: vi_VN -> en_XX).
+    src_lang: str | None = None
+    tgt_lang: str | None = None
 
     @classmethod
     def from_dict(cls, name: str, data: Mapping[str, Any]) -> "ModelSpec":
@@ -111,6 +115,8 @@ class ModelSpec:
             est_vram_mb=int(data.get("est_vram_mb", 0) or 0),
             devices=tuple(str(d) for d in devices),
             pinned=bool(data.get("pinned", False)),
+            src_lang=(str(data["src_lang"]) if data.get("src_lang") else None),
+            tgt_lang=(str(data["tgt_lang"]) if data.get("tgt_lang") else None),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -123,6 +129,8 @@ class ModelSpec:
             "est_vram_mb": self.est_vram_mb,
             "devices": list(self.devices),
             "pinned": self.pinned,
+            "src_lang": self.src_lang,
+            "tgt_lang": self.tgt_lang,
         }
 
 
@@ -630,3 +638,85 @@ def create_registry(
         evict_to=evict_to,
         loaders=loaders,
     )
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Bộ tham số cho `python -m artrag.registry`."""
+    parser = argparse.ArgumentParser(
+        prog="python -m artrag.registry",
+        description="Registry model: chạy smoke test cho loader hoặc in thống kê.",
+    )
+    parser.add_argument(
+        "--smoke",
+        nargs="+",
+        metavar="MODEL",
+        help="Danh sách tên model trong configs/models.yaml để nạp và suy luận thử.",
+    )
+    parser.add_argument(
+        "--stats", action="store_true", help="Chỉ in thống kê registry, không nạp model."
+    )
+    parser.add_argument("--profile", default=None, help="Profile config (mặc định: local).")
+    parser.add_argument(
+        "--set",
+        dest="overrides",
+        action="append",
+        default=[],
+        metavar="a.b=c",
+        help="Ghi đè config, có thể dùng nhiều lần.",
+    )
+    parser.add_argument(
+        "--image", default=None, help="Ảnh dùng cho suy luận (mặc định: ảnh trong kho)."
+    )
+    parser.add_argument(
+        "--query",
+        default="a painting",
+        help="Câu hỏi dùng cho suy luận (mặc định: 'a painting').",
+    )
+    parser.add_argument(
+        "--keep", action="store_true", help="Không giải phóng model sau khi suy luận."
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Điểm vào của `python -m artrag.registry`."""
+    args = build_arg_parser().parse_args(argv)
+
+    cfg = load_config(profile=args.profile, overrides=args.overrides)
+
+    if args.smoke:
+        from artrag.models.smoke import run_smoke  # noqa: PLC0415 - import cục bộ có chủ đích
+
+        return run_smoke(
+            list(args.smoke),
+            cfg=cfg,
+            image_arg=args.image,
+            query=args.query,
+            keep=args.keep,
+        )
+
+    if args.stats:
+        from artrag.models import loaders  # noqa: PLC0415,F401
+
+        registry = create_registry(cfg)
+        stats = registry.stats()
+        print(f"budget_mb={stats['budget_mb']} loaded={stats['loaded']}")
+        for name, spec in registry.specs.items():
+            print(
+                f"  {name}: task={spec.task} hf_id={spec.hf_id} dtype={spec.dtype} "
+                f"est={spec.est_vram_mb}MB devices={list(spec.devices)} "
+                f"pinned={spec.pinned}"
+            )
+        return 0
+
+    print("Chưa có lệnh nào. Dùng: --smoke <model> [<model> ...] hoặc --stats")
+    return 2
+
+
+if __name__ == "__main__":  # pragma: no cover - điểm vào CLI
+    raise SystemExit(main())

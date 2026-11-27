@@ -119,11 +119,15 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 - **Kết quả 2026-11-26 (verify độc lập bằng subagent)**: `tests/test_registry.py` → **26 passed**; toàn bộ suite → **289 passed** (263 cũ + 26 mới). `src/artrag/registry.py` **không import torch ở thời điểm import** (torch chỉ được import lazy trong `TorchDeviceManager`) nên module import được khi chưa cài torch — torch sẽ thêm ở T2.2. `configs/models.yaml` khớp **100%** với bảng model trong §6.2 (11 model, cùng `task`/`hf_id`/`est_vram_mb`).
 - **Ghi chú thiết kế**: thêm khối `models:` (chỉ có `evict_to: cpu`) vào `configs/default.yaml`; `configs/models.yaml` nằm **ngoài** chuỗi gộp §6.1 và được nạp riêng bởi `load_model_specs(cfg)`, thứ tự `configs/models.yaml` < `cfg["models"]` (profile/experiment/--set) — `configs/profiles/local.yaml` đã có sẵn khối `models:` (ghim `clip`, đẩy `text_embed`/`vi2en`/`en2vi` về CPU) và nay được dùng thật.
 
-### [ ] T2.2 Loader thật cho model thị giác và embedding
+### [x] T2.2 Loader thật cho model thị giác và embedding (2026-11-27)
 - **Files**: `src/artrag/models/loaders.py` (đăng ký clip, sbert, blip_itm, blip_cap, blip_vqa, seq2seq, nli), `src/artrag/registry.py` (`--smoke`).
 - **Deps**: thêm `torch` (index cu121 cho Windows), `transformers`, `sentence-transformers`, `faiss-cpu`, `pillow`.
 - **Verify** (local): `uv run python -m artrag.registry --smoke clip blip_itm text_embed` → mỗi model in device/dtype, VRAM thực, thời gian nạp và một lần infer thử (ảnh fixture + câu "a painting").
 - **Done khi**: chạy được trên GTX 1650. Nếu model nào không vừa thì ghi lại vào profile `local` (devices: cpu).
+- **Kết quả 2026-11-27 (verify độc lập bằng subagent)**: `--smoke` nạp + suy luận thử **cả 7 loader** thành công trên GTX 1650: `clip` (fp16/cuda, 296 MB, dim 512), `text_embed` (BGE-M3 fp32/cpu, dim 1024), `blip_itm` (fp16/cuda, itm_score 0.684), `blip_cap` (fp16/cuda, caption "a painting of two men rowing on a lake"), `blip_vqa` (fp16/cuda, trả lời "4"), `vi2en` (fp32/cpu, "Xin chào" → "Good afternoon, sir."), `nli` (fp16/cuda, entailment). `tests/test_loaders.py` → **25 passed**; toàn bộ suite → **314 passed**.
+- **Ghi chú phụ thuộc (quan trọng cho máy khác)**: `transformers` phải ghim `>=4.46,<4.47` — từ 4.47 trở đi, transformers chặn `torch.load` khi torch < 2.6 (CVE-2025-32434), mà index cu121 chỉ có torch tới 2.5.1, nên các checkpoint chỉ có `.bin` (CLIP, BGE-M3, BLIP-ITM/CAP, vinai) sẽ không nạp được. Thêm `accelerate` (bắt buộc cho `low_cpu_mem_usage=True`), `protobuf` + `sentencepiece` (tokenizer MBart của vinai).
+- **Ghi chú thiết kế**: thêm `src_lang`/`tgt_lang` vào `configs/models.yaml` cho model dịch vinai — MBart **bắt buộc** set `src_lang` cho tokenizer và `decoder_start_token_id` = token ngôn ngữ đích khi generate, nếu không sinh ra chuỗi lặp vô nghĩa ("Xin Xin Xin ..."). Số đo thực tế ghi ở §6.2.1 của SYSTEM_DESIGN.
+- **Profile `local`**: `text_embed` (BGE-M3) và `vi2en`/`en2vi` giữ ở CPU; `nli` chuyển sang fp16 (539 MB thay vì 1 065 MB, nhãn dự đoán không đổi); `est_vram_mb` của `blip_vqa` nâng 750 → 800 theo số đo.
 
 ### [ ] T2.3 Interface LLM + cache + retry + openai_compat (§6.3)
 - **Files**: `src/artrag/llm/{base.py,cache.py,openai_compat.py,__init__.py}` (`get_backend(cfg)`), `tests/test_llm_cache.py`.
