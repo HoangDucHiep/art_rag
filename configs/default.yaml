@@ -65,9 +65,6 @@ index:
   caption_model: blip_cap
   caption_max_new_tokens: 30
   caption_num_beams: 3
-  caption_model: blip_cap
-  caption_max_new_tokens: 30
-  caption_num_beams: 3
 
 # Cấu hình registry (SYSTEM_DESIGN 6.2). Danh mục model nằm ở configs/models.yaml;
 # khối `models:` dưới đây chỉ chứa ghi đè theo profile/experiment/--set.

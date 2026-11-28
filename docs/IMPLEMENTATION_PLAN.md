@@ -175,7 +175,7 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
 
 ## M3. Index offline ☁️ (tuần 1–2)
 
-### [ ] T3.1 VectorIndex + CLIP index (§4 bước 6)
+### [x] T3.1 VectorIndex + CLIP index (§4 bước 6) (2026-11-28)
 - **Files**: `src/artrag/index/{vector_index.py,clip_index.py}`, `tests/test_vector_index.py`.
 - **Nội dung**:
   - `VectorIndex` (build từ npy, lưu/đọc, `search(q,k)`, `meta.json` có `kb_hash`, `StaleIndexError`);
@@ -184,19 +184,34 @@ Quy ước lệnh: mọi lệnh chạy từ gốc repo bằng `uv run …`; Pyth
   - `uv run pytest tests/test_vector_index.py -q` (vector ngẫu nhiên, top-1 của chính nó);
   - local: `uv run python -m artrag.index.clip_index build --limit 100` rồi `search "two men rowing a boat"` → in top-5 kèm điểm.
 - **Chạy đầy đủ** ☁️: notebook (T3.4).
+- **Kết quả 2026-11-28 (verify độc lập bằng subagent)**: `tests/test_vector_index.py` → **25 passed**; toàn bộ suite → **448 passed**. `build --limit 100` trên cuda (dim 512, 5,6 s) → `search "two men rowing a boat"` **top-1 = `cma-151904`** (*The Biglin Brothers Turning the Stake*, Thomas Eakins) — đúng tranh hai người chèo thuyền. `check` → OK, `kb_hash` (`c41408c331b36d47`) khớp `artifacts.kb_fingerprint`. Idempotent (build lại không `--force` → bỏ qua) và STALE đã kiểm thật (sửa `kb_hash` trong `meta.json` → `check` báo STALE, `search` exit code 1). **Mutation testing 10/10 mutant bị test bắt** (đảo thứ tự `ids`, bỏ L2-normalize, bỏ kiểm tra `kb_hash`, `IndexFlatL2` thay `IndexFlatIP`, …).
+- **Ghi chú thiết kế (2 điểm)**:
+  - **Không serialize file FAISS**: §2.4 ghi `index/clip-{tag}/{emb.npy, ids.json, faiss.index, meta.json}` nhưng code dựng lại `IndexFlatIP` từ `emb.npy` mỗi lần load (vài ms) — với ~2.210 vector tìm kiếm chính xác dưới 1 ms nên không cần. **Đã sửa §2.4** thành `index/clip/{emb.npy, ids.json, meta.json}` và `index/text/{...}`. Nếu mở rộng ≥100k vector thì chuyển sang serialize `faiss.index`.
+  - Thêm khoá config `index.batch_size_cpu: 16` (thay vì hardcode 16 trong code) — §4 ghi "batch 64 (GPU) / 16 (CPU)".
+  - `kb_hash` của index **tái sử dụng đúng** `artrag.tools.artifacts.kb_fingerprint()` → khớp `kb_hash` trong `manifest.json` của artefact.
 
-### [ ] T3.2 Text index BGE-M3 (§4 bước 7)
-- **Files**: `src/artrag/index/text_index.py`.
+### [x] T3.2 Text index BGE-M3 (§4 bước 7) (2026-11-28)
+- **Files**: `src/artrag/index/text_index.py`, `tests/test_text_index.py`.
 - **Verify**: `build --limit 500` (CPU) rồi `search "ai vẽ tranh hai anh em chèo thuyền"` → top chunk thuộc `cma-151904` (nếu nằm trong 500 chunk đầu; không thì chạy với `--ids cma-151904`).
+- **Kết quả 2026-11-28 (verify độc lập bằng subagent)**: `tests/test_text_index.py` → **8 passed**; toàn bộ suite → **448 passed**. `build --limit 500` trên **CPU fp32** mất **557–638 s** (~1,2 s/chunk) → n=500, dim=1024, `kb_hash` khớp. `search "ai vẽ tranh hai anh em chèo thuyền"` → **top-1 = `cma-151904#description#0`** (0,4942), top-5 đều thuộc `cma-151904` (đúng yêu cầu "nếu không nằm trong 500 chunk đầu thì chạy `--ids cma-151904`" — cả hai đường đều cho top-1 đúng). `check` → OK.
+- **Ghi chú (quan trọng cho vận hành)**: BGE-M3 chạy CPU fp32 theo profile `local` → build **toàn bộ 10.575 chunk cần ~3,7 giờ**. Vì vậy bước build full offline **bắt buộc chạy trên GPU (Colab/Kaggle T4)** qua notebook T3.4. Profile `colab`/`kaggle` đã ép `text_embed` về `cuda`.
 
-### [ ] T3.3 Caption toàn bộ (§4 bước 8)
-- **Files**: `src/artrag/index/captions.py`.
+### [x] T3.3 Caption toàn bộ (§4 bước 8) (2026-11-28)
+- **Files**: `src/artrag/index/captions.py`, `tests/test_captions.py`.
 - **Verify**: `build --limit 10` → parquet 10 dòng, in 3 caption và ms/ảnh. Chạy lại thì 0 ảnh mới.
+- **Kết quả 2026-11-28 (verify độc lập bằng subagent)**: `tests/test_captions.py` → **3 passed**; toàn bộ suite → **448 passed**. `build --limit 10` → parquet 10 dòng, **5 cột đúng schema** `artwork_id, model, params_hash, caption, ms`, 3 caption mẫu hợp lý ("a painting of a man with a book", "a painting of a woman in a blue dress sitting on a chair", "a painting of two boxers fighting in a boxing ring"), trung bình **3.403 ms/ảnh**. Chạy lại → **"Caption mới: 0"** (idempotent). `check` → độ phủ 10/2.210 ảnh (0,5%).
+- **Ghi chú vận hành**: 3,4 s/ảnh trên GTX 1650 (beam 3, 30 token) → caption toàn bộ 2.210 ảnh mất ~**2 giờ**, nên chạy trên Colab/Kaggle (T4) qua notebook T3.4. Tham số sinh đặt trong config (`index.caption_model` / `index.caption_num_beams` / `index.caption_max_new_tokens`); `params_hash` = hash tham số → đổi tham số thì sinh lại sang file caption riêng, không đè lên bản cũ.
 
-### [ ] T3.4 Notebook offline mỏng ☁️
+### [x] T3.4 Notebook offline mỏng ☁️ (2026-11-28)
 - **Files**: `notebooks/colab_offline.ipynb` (dùng được cho cả Kaggle).
 - **Nội dung** (chỉ các cell gọi lệnh): clone repo → `pip install -e .` → mount Drive hoặc đọc input Kaggle → `unpack` KB và ảnh → `clip_index build` → `text_index build` → `captions build` → `artifacts pack` → lưu lên Drive.
 - **Verify**: chạy hết trên Colab T4 và ghi thời gian từng bước vào `results/offline_build.md`. Ở local, `unpack` rồi chạy `clip_index check` và `text_index check` → OK, `kb_hash` khớp.
+- **Kết quả 2026-11-28 (verify độc lập bằng subagent)**: notebook JSON hợp lệ, **16 cell**, 11 cell Python parse OK (`ast.parse`). Mọi cờ CLI trong notebook đã đối chiếu với `--help` của CLI thật → **không có cờ nào thiếu**. Chuỗi `artifacts pack --only kb,images,index,cache` (2.221 file) → `unpack --strict` → **"Khớp manifest: OK"**, `kb_hash` giữ nguyên trong `meta.json` của cả `index/clip` và `index/text`.
+- **Ghi chú (2 điểm cần lưu ý)**:
+  - **Biến Python không nhìn thấy trong cell `!`**: bản đầu tiên của notebook dùng `$PROFILE`/`$BUILD_LIMIT_ARGS` trong lệnh shell → shell **không** đọc được biến Python → `--profile ""` và `git clone ""`. Đã sửa: cell cấu hình xuất biến qua `os.environ[...]`, các cell build/check/search dùng `subprocess.run` với **list args** (không phụ thuộc shell expansion) → **0 biến `$VAR` trong lệnh shell**.
+  - **Đo thời gian bằng `time.perf_counter()`** quanh `subprocess.run` (hàm tiện ích `run_step`) thay vì `/usr/bin/time` — không phụ thuộc `/usr/bin/time` có sẵn trên Colab/Kaggle hay không, và vẫn ghi được trạng thái lỗi vào `results/offline_build.md`.
+  - `pyproject.toml`: nới `requires-python` từ `>=3.11,<3.12` thành `>=3.11,<3.13` để `pip install -e .` chạy được trên runtime Python 3.12 của Colab/Kaggle. Ghim `transformers>=4.46,<4.47` **giữ nguyên** (không nâng phiên bản).
+  - `REPO_URL` trong cell cấu hình là placeholder — phải thay bằng URL Git thật (cell có `raise ValueError` nếu chưa thay).
 
 ---
 
