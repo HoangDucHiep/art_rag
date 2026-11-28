@@ -23,6 +23,8 @@ from artrag.pipeline.translate import (
     join_segments,
     looks_vietnamese,
     protect_citations,
+    protect_names,
+    restore_names,
     split_segments,
     translate_segments,
 )
@@ -276,6 +278,181 @@ def test_looks_vietnamese_detects_unaccented_words():
 
 def test_looks_vietnamese_empty():
     assert not looks_vietnamese("")
+
+
+# ---------------------------------------------------------------------------
+# (d2) Bảo vệ danh tính (tên riêng)
+# ---------------------------------------------------------------------------
+
+
+def test_protect_names_replaces_proper_noun_with_placeholder():
+    protected, names = protect_names("The painter is Thomas Eakins.")
+
+    assert names == ["Thomas Eakins"]
+    assert protected == "The painter is §0§."
+
+
+def test_protect_names_keeps_multiword_name_together():
+    """Tên có từ nối viết thường ("van Gogh") phải giữ trọn."""
+    protected, names = protect_names("It was painted by Vincent van Gogh.")
+
+    assert names == ["Vincent van Gogh"]
+    assert protected == "It was painted by §0§."
+
+
+def test_protect_names_ignores_common_words_at_sentence_start():
+    """Từ thường gặp viết hoa ở đầu câu không phải tên riêng."""
+    protected, names = protect_names("Two men rowing a boat.")
+
+    assert names == []
+    assert protected == "Two men rowing a boat."
+
+
+def test_protect_names_ignores_single_common_noun():
+    protected, names = protect_names("Gallery 207")
+
+    assert names == []
+    assert protected == "Gallery 207"
+
+
+def test_protect_names_restore_roundtrip_is_identity():
+    """Bất biến: bảo vệ rồi khôi phục phải khớp nguyên văn."""
+    samples = [
+        "Thomas Eakins",
+        "Thomas Eakins painted it in 1873.",
+        "It was painted by Vincent van Gogh.",
+        "Claude Monet painted the water lilies.",
+        "Two men rowing a boat.",
+        "The painting shows two men rowing a boat.",
+    ]
+
+    for text in samples:
+        protected, names = protect_names(text)
+        assert restore_names(protected, names) == text
+
+
+def test_restore_names_puts_original_text_back():
+    assert restore_names("§0§ painted it.", ["Thomas Eakins"]) == (
+        "Thomas Eakins painted it."
+    )
+
+
+def test_protect_names_empty_text():
+    assert protect_names("") == ("", [])
+
+
+def test_protect_names_roundtrip_with_existing_placeholder_text():
+    """Văn bản đã chứa placeholder `[[n]]` không được làm hỏng round-trip."""
+    text = "See [[0]] for details about Thomas Eakins."
+
+    protected, names = protect_names(text)
+
+    assert restore_names(protected, names) == text
+
+
+def test_protect_names_ignores_img_token_without_brackets():
+    """Chuỗi "IMG-01" không có ngoặc vuông không phải tên riêng."""
+    protected, names = protect_names("IMG-01")
+
+    assert names == []
+    assert protected == "IMG-01"
+
+
+def test_translator_en_to_vi_protects_names(monkeypatch):
+    """Tên riêng phải đi qua máy dịch dưới dạng placeholder, rồi khôi phục."""
+    from artrag.models import inference
+
+    seen: list[str] = []
+
+    def fake_translate(handle, text, **gen):
+        seen.append(text)
+        return f"<<{text}>>"
+
+    monkeypatch.setattr(inference, "translate", fake_translate)
+
+    translator = Translator(registry=FakeRegistry(), use_cache=False)
+    out = translator.en_to_vi("The painter is Thomas Eakins.")
+
+    assert out == "<<The painter is Thomas Eakins.>>"
+    assert seen == ["The painter is §0§."]
+
+
+def test_translator_vi_to_en_does_not_protect_names(monkeypatch):
+    """Hướng VI->EN không dùng placeholder (vi2en xoá placeholder ở đầu đoạn)."""
+    from artrag.models import inference
+
+    seen: list[str] = []
+
+    def fake_translate(handle, text, **gen):
+        seen.append(text)
+        return "TRANSLATED"
+
+    monkeypatch.setattr(inference, "translate", fake_translate)
+
+    translator = Translator(registry=FakeRegistry(), use_cache=False)
+    translator.vi_to_en("Tranh này do Thomas Eakins vẽ năm 1873.")
+
+    assert seen == ["Tranh này do Thomas Eakins vẽ năm 1873."]
+
+
+def test_translator_vi_to_en_keeps_english_evidence_untouched(monkeypatch):
+    """Evidence tiếng Anh không được đưa qua vi2en (dịch làm mất thông tin)."""
+    from artrag.models import inference
+
+    seen: list[str] = []
+
+    def fake_translate(handle, text, **gen):
+        seen.append(text)
+        return "TRANSLATED"
+
+    monkeypatch.setattr(inference, "translate", fake_translate)
+
+    translator = Translator(registry=FakeRegistry(), use_cache=False)
+    evidence = " Biglin Brothers - Thomas Eakins, 1873. Oil on canvas."
+
+    out = translator.vi_to_en(evidence)
+
+    assert seen == []
+    assert out == evidence
+
+
+def test_translator_vi_to_en_keeps_evidence_header_intact(monkeypatch):
+    """Đoạn evidence có citation phải giữ nguyên title + artist + năm."""
+    from artrag.models import inference
+
+    seen: list[str] = []
+
+    def fake_translate(handle, text, **gen):
+        seen.append(text)
+        return "TRANSLATED"
+
+    monkeypatch.setattr(inference, "translate", fake_translate)
+
+    translator = Translator(registry=FakeRegistry(), use_cache=False)
+    out = translator.vi_to_en(
+        "[IMG-01] Biglin Brothers - Thomas Eakins, 1873. Oil on canvas."
+    )
+
+    assert seen == []
+    assert out == "[IMG-01] Biglin Brothers - Thomas Eakins, 1873. Oil on canvas."
+
+
+def test_protect_names_does_not_break_citation_labels():
+    """Nhãn citation có cơ chế bảo vệ riêng, không được đụng tới."""
+    protected, names = protect_names("[IMG-01] Thomas Eakins")
+
+    assert "[IMG-01]" in protected
+    assert "IMG-01" not in names
+
+
+def test_protect_names_splits_title_and_artist():
+    """Định dạng evidence `{title} - {artist}` không được gộp làm một tên."""
+    protected, names = protect_names(
+        " Biglin Brothers - Thomas Eakins, 1873. Oil on canvas."
+    )
+
+    assert names == ["Biglin Brothers", "Thomas Eakins"]
+    assert protected == " §0§ - §1§, 1873. Oil on canvas."
 
 
 # ---------------------------------------------------------------------------

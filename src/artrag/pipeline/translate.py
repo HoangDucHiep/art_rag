@@ -1,6 +1,6 @@
 """Dịch thuật và bảo vệ citation khi dịch (T2.5, SYSTEM_DESIGN 6.3/6.4).
 
-Module này gồm hai phần:
+Module này gồm ba phần:
 
 1. **`Translator`** — bọc hai model dịch của registry (`vi2en`, `en2vi`) qua
    `artrag.models.inference.translate` (tái sử dụng, không viết lại pipeline).
@@ -16,6 +16,25 @@ Module này gồm hai phần:
    hỏng — không phụ thuộc việc model giữ được ký tự đặc biệt.
 
    Hàm thuần ở đây **không cần GPU hay model**, nên test được nhanh.
+
+3. **Bảo vệ danh tính** (`protect_names`, `restore_names`) — cơ chế
+   **bảo vệ tên riêng** khi dịch EN <-> VI:
+
+   Model dịch `en2vi` (vinai MBart) sai tên riêng khi tên đứng một mình,
+   ví dụ `"Thomas Eakins"` -> `"Thich Nhat Hanh"` (đúng là một nhà sư người
+   Việt khác). Khi tên nằm trong câu có ngữ cảnh thì model giữ được.
+
+   Vì vậy, trước khi dịch, các cụm danh tính được thay bằng placeholder
+   dạng `§0§`, `§1§`…; sau khi dịch thì khôi phục lại tên gốc.
+
+   **Chỉ an toàn với `en2vi`**: đo thực tế cho thấy `en2vi` giữ nguyên
+   placeholder ở mọi vị trí, còn `vi2en` **xoá** placeholder đứng ở **đầu
+   đoạn** (kéo theo mất nội dung dính liền). Vì vậy cơ chế này **chỉ** được
+   bật cho hướng EN -> VI; xem `Translator._translate_core`.
+
+   Ví dụ:
+
+   "Thomas Eakins" -> "§0§" -> "Thomas Eakins" (thay vì "Thich Nhat Hanh")
 
 Ví dụ:
 
@@ -47,6 +66,108 @@ DEFAULT_CACHE_DIR = "translate"
 
 #: Ký tự tiếng Việt có dấu (để phát hiện ngôn ngữ khi không cần model).
 _VIETNAMESE_CHARS = re.compile(r"[À-ỹĐđ]")
+
+#: Cụm danh tính (proper noun): các từ viết hoa liền nhau, có thể có từ nối
+#: viết thường (`van`, `de`, `la`…) để giữ trọn tên như "Vincent van Gogh".
+#:
+#: Chữ số **không** nằm trong cụm danh tính: "Gallery 207" là một danh từ
+#: chứ không phải tên riêng.
+#:
+#: Dấu gạch nối **có khoảng trắng** (" - ") **không** nối hai từ trong cụm:
+#: định dạng evidence là `{title} - {artist}, {year}` nên "Biglin Brothers -
+#: Thomas Eakins" phải tách thành hai cụm, không gộp làm một tên.
+_NAME_WORD = r"[A-Z][A-Za-z'’]*(?:-[A-Z][A-Za-z'’]*)*"
+_NAME_LINK = r"(?:van|von|de|del|della|di|da|do|le|la|du|dos|das)"
+_NAME_RE = re.compile(
+    rf"\b{_NAME_WORD}(?: (?:{_NAME_WORD}|{_NAME_LINK}))*\b"
+)
+
+#: Cụm danh tính **hoặc** nhãn citation — dùng để quét một lần, biết chắc
+#: phần nào là citation để giữ nguyên.
+_NAME_OR_CITATION_RE = re.compile(
+    rf"(?P<citation>{CITATION_RE.pattern})|(?P<name>{_NAME_RE.pattern})"
+)
+
+#: Sentinel dùng làm placeholder khi bảo vệ danh tính.
+#:
+#: Dạng `[[0]]` dễ va chạm với văn bản đã chứa sẵn placeholder (làm hỏng
+#: bất biến `restore_names(*protect_names(t)) == t`). Vì vậy dùng sentinel
+#: có xác suất va chạm thấp hơn: chữ `Đ` (viết hoa có dấu) hiếm gặp trong
+#: văn bản tiếng Anh, và model dịch vẫn giữ nguyên chuỗi này.
+_NAME_SENTINEL = "§"
+
+#: Từ chức năng hay đứng đầu câu -> không phải tên riêng.
+_NAME_STOP_STARTERS = frozenset(
+    {
+        "A", "An", "The", "This", "That", "These", "Those", "It", "Its",
+        "In", "On", "At", "Of", "For", "From", "By", "With", "As", "And",
+        "But", "Or", "So", "There", "Here", "He", "She", "They", "We", "I",
+        "His", "Her", "Their", "Our", "My", "Your", "You", "If", "When",
+        "While", "After", "Before", "During", "Both", "Each", "Many",
+        "Most", "Some", "Two", "Three", "Four", "Five", "Six", "Seven",
+        "Eight", "Nine", "Ten", "One", "No", "Not", "Yes", "Do", "Does",
+        "Is", "Are", "Was", "Were", "Has", "Have", "Had", "Can", "Could",
+        "Will", "Would", "Should", "May", "Might", "Must", "Also", "Only",
+        "More", "Much", "Such", "Same", "Other", "Others", "Another",
+        "First", "Second", "Third", "Last", "Next", "Now", "Then", "Even",
+        "Still", "Yet", "Thus", "Like", "Until",
+    }
+)
+
+#: Từ tiếng Anh thường gặp — nếu một từ đơn viết hoa mà nằm trong danh sách
+#: này thì đó là danh từ/động từ viết hoa ở đầu câu, **không** phải tên riêng.
+#:
+#: Danh sách rút gọn, đủ cho câu trả lời ngắn kiểu caption/VQA mà hệ thống
+#: sinh ra. Cụm nhiều từ ("Claude Monet") không cần danh sách này.
+_COMMON_WORDS = frozenset(
+    {
+        "a", "about", "above", "across", "after", "again", "against", "all",
+        "along", "also", "although", "always", "an", "and", "another", "any",
+        "are", "around", "as", "at", "back", "be", "because", "been", "before",
+        "being", "below", "beside", "besides", "between", "beyond", "both",
+        "but", "by", "can", "cannot", "could", "did", "do", "does", "doing",
+        "done", "down", "during", "each", "either", "else", "even", "ever",
+        "every", "few", "for", "from", "further", "had", "has", "have",
+        "having", "he", "her", "here", "hers", "him", "his", "how", "however",
+        "i", "if", "in", "into", "is", "it", "its", "itself", "just", "like",
+        "made", "make", "makes", "many", "may", "might", "more", "most",
+        "much", "must", "my", "neither", "never", "no", "nor", "not", "now",
+        "of", "off", "on", "once", "one", "only", "or", "other", "others",
+        "our", "ours", "out", "over", "own", "perhaps", "quite", "rather",
+        "same", "shall", "she", "should", "since", "so", "some", "such",
+        "than", "that", "the", "their", "theirs", "them", "then", "there",
+        "these", "they", "this", "those", "though", "through", "thus", "to",
+        "too", "under", "until", "up", "upon", "us", "very", "was", "we",
+        "were", "what", "when", "where", "whether", "which", "while", "who",
+        "whom", "whose", "why", "will", "with", "within", "without", "would",
+        "yet", "you", "your", "yours",
+        # Danh từ/động từ thường gặp trong mô tả tranh.
+        "answer", "artist", "background", "barge", "boat", "canvas",
+        "collection", "depicts", "depicting", "drawn", "drawing", "evidence",
+        "exhibition", "figure", "figures", "foreground", "gallery", "group",
+        "history", "image", "images", "landscape", "life", "man", "men",
+        "museum", "oil", "on", "painter", "painting", "paintings", "person",
+        "picture", "pictures", "portrait", "shown", "shows", "source",
+        "summary", "title", "view", "woman", "women", "work", "works",
+        "year", "years", "created", "made", "painted", "features",
+        "contains", "including", "known", "large", "left", "right",
+        "behind", "front", "center", "centre", "middle",
+        "upper", "lower", "part", "side", "edge", "top", "bottom",
+        # Số từ -> không phải tên riêng.
+        "one", "two", "three", "four", "five", "six", "seven", "eight",
+        "nine", "ten", "eleven", "twelve", "first", "second", "third",
+        "fourth", "fifth", "last", "next", "other", "another",
+        # Từ viết hoa ở đầu câu trong câu trả lời kiểu caption/VQA.
+        "hello", "gallery", "source", "image", "picture", "painting",
+        "museum", "collection", "artist", "painter", "title", "wikimedia",
+        "wikipedia", "answer", "question", "evidence", "summary",
+        "both", "two", "several", "various", "unknown", "untitled",
+        "detail", "details", "close", "close-up", "view", "scenes",
+        "design", "element", "elements", "the", "this", "that",
+        # Ký hiệu nội bộ -> không phải tên riêng.
+        "img", "image", "id", "url", "http", "https", "www",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -171,6 +292,60 @@ _VI_COMMON_WORDS = frozenset(
 
 
 # ---------------------------------------------------------------------------
+# Hàm thuần: bảo vệ danh tính (tên riêng)
+# ---------------------------------------------------------------------------
+
+
+def protect_names(text: str) -> tuple[str, list[str]]:
+    """Thay cụm danh tính bằng placeholder ``§0§``, ``§1§``…
+
+    Model dịch `en2vi` (vinai MBart) sai tên riêng khi tên đứng một mình:
+    `"Thomas Eakins"` -> `"Thich Nhat Hanh"`. Giữ tên nguyên vẹn là an toàn
+    hơn là cố dịch.
+
+    Hàm thuần — không cần GPU. Trả về `(văn bản đã bảo vệ, danh sách tên)`.
+    """
+    if not text:
+        return "", []
+
+    names: list[str] = []
+    parts: list[str] = []
+    last = 0
+    for match in _NAME_OR_CITATION_RE.finditer(text):
+        phrase = match.group(0)
+        if match.group("citation"):
+            # Nhãn citation có cơ chế bảo vệ riêng (`split_segments`), nên
+            # được giữ nguyên — không đụng tới ở đây.
+            continue
+        words = phrase.split()
+        if words[0] in _NAME_STOP_STARTERS:
+            continue
+        if not any(ch.isalpha() for ch in phrase):
+            # Cụm chỉ gồm số -> không phải tên riêng.
+            continue
+        if len(words) == 1 and words[0].lower() in _COMMON_WORDS:
+            # Một từ đơn nằm trong danh sách từ thường gặp -> danh từ/động từ
+            # viết hoa ở đầu câu, không phải tên riêng.
+            continue
+        names.append(phrase)
+        parts.append(text[last : match.start()])
+        parts.append(f"{_NAME_SENTINEL}{len(names) - 1}{_NAME_SENTINEL}")
+        last = match.end()
+    parts.append(text[last:])
+    return "".join(parts), names
+
+
+def restore_names(text: str, names: list[str]) -> str:
+    """Khôi phục các cụm danh tính đã được bảo vệ bằng `protect_names`."""
+    for index, name in enumerate(names):
+        text = text.replace(
+            f"{_NAME_SENTINEL}{index}{_NAME_SENTINEL}",
+            name,
+        )
+    return text
+
+
+# ---------------------------------------------------------------------------
 # Translator
 # ---------------------------------------------------------------------------
 
@@ -244,12 +419,45 @@ class Translator:
         return translated
 
     # -- interface --------------------------------------------------------
+    def _translate_core(self, model_name: str, core: str, direction: str) -> str:
+        """Dịch một đoạn thuần theo **hướng** dịch đã cho.
+
+        `direction` là `"vi2en"` hoặc `"en2vi"` — phân nhánh theo **hướng**,
+        không theo tên model, để cấu hình đặt nhầm tên model không làm đổi hành vi.
+
+        Hướng EN -> VI: danh tính được thay bằng placeholder **trước** khi dịch
+        và khôi phục **sau** khi dịch, vì model `en2vi` dịch sai tên riêng đứng
+        một mình (đo thực tế: `"Thomas Eakins"` -> `"Thich Nhat Hanh"`).
+
+        Hướng VI -> EN: **không** dùng placeholder, vì model `vi2en` **xoá**
+        placeholder đứng ở đầu đoạn (kéo theo mất nội dung dính liền — đo thực
+        tế: đoạn evidence `" §0§, 1873. Oil on canvas…"` thành
+        `"Oil on canvas…"`, mất luôn title + artist + năm). Với hướng này, văn
+        bản **tiếng Anh** (evidence) được giữ nguyên: model `vi2en` không cần
+        dịch nội dung đã là tiếng Anh, và dịch nó chỉ làm mất thông tin.
+        """
+        if direction == "en2vi":
+            if looks_vietnamese(core):
+                # Nội dung tiếng Việt: không bảo vệ danh tính (từ đầu câu viết
+                # hoa sẽ bị chặn khỏi việc dịch).
+                return self._translate(model_name, core)
+            protected, names = protect_names(core)
+            if not names:
+                return self._translate(model_name, core)
+            translated = self._translate(model_name, protected)
+            return restore_names(translated, names)
+
+        # Hướng VI -> EN: chỉ dịch nội dung tiếng Việt.
+        if looks_vietnamese(core):
+            return self._translate(model_name, core)
+        return core
+
     def vi_to_en(self, text: str) -> str:
         """Dịch tiếng Việt sang tiếng Anh, giữ nguyên mọi citation."""
         if not text:
             return ""
         return translate_segments(
-            text, lambda core: self._translate(self.vi2en_model, core)
+            text, lambda core: self._translate_core(self.vi2en_model, core, "vi2en")
         )
 
     def en_to_vi(self, text: str) -> str:
@@ -257,7 +465,7 @@ class Translator:
         if not text:
             return ""
         return translate_segments(
-            text, lambda core: self._translate(self.en2vi_model, core)
+            text, lambda core: self._translate_core(self.en2vi_model, core, "en2vi")
         )
 
     def close(self) -> None:
@@ -277,6 +485,8 @@ __all__ = [
     "join_segments",
     "looks_vietnamese",
     "protect_citations",
+    "protect_names",
+    "restore_names",
     "split_segments",
     "translate_segments",
 ]

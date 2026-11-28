@@ -576,6 +576,34 @@ Kết luận:
   hỏng. Hàm thuần (`split_segments`, `join_segments`, `protect_citations`,
   `translate_segments`) **không cần GPU** nên test được nhanh.
   Bất biến: `join_segments(split_segments(t)) == t`.
+- **Bảo vệ danh tính khi dịch** (cùng module): model `en2vi` (vinai MBart) sai
+  tên riêng khi tên **đứng một mình** — đo thực tế: `"Thomas Eakins"` ->
+  `"Thich Nhat Hanh"` (một nhà sư người Việt khác). Khi tên nằm trong câu có
+  ngữ cảnh thì model giữ đúng. Vì vậy, trước khi dịch, các cụm danh tính
+  được thay bằng placeholder `§0§`, `§1§`… và khôi phục lại sau khi dịch.
+  Hàm thuần `protect_names` / `restore_names`, bất biến `restore_names(*protect_names(t)) == t`.
+  - Placeholder dùng sentinel `§` (ít va chạm) thay vì `[[n]]`, vì dạng `[[n]]`
+    dễ va chạm với văn bản đã chứa sẵn placeholder và làm hỏng bất biến
+    round-trip. Đo thực tế: `§0§` sống sót qua **cả hai** model dịch.
+  - **Chỉ bật cho hướng EN -> VI.** Đo thực tế: `en2vi` giữ nguyên placeholder ở
+    mọi vị trí, còn `vi2en` **xoá** placeholder đứng ở **đầu đoạn** (kéo theo
+    mất nội dung dính liền — đoạn evidence `" §0§, 1873. Oil on canvas…"`
+    thành `"Oil on canvas…"`, mất luôn title + artist + năm). Bật cho hướng
+    ngược lại sẽ **hồi quy** so với không bảo vệ gì.
+  - Phân nhánh theo **hướng dịch** (`"en2vi"` / `"vi2en"`), không theo tên model,
+    để cấu hình đặt nhầm tên model không làm đổi hành vi.
+  - Hướng VI -> EN: nội dung **tiếng Anh** (evidence) được giữ nguyên, không đưa
+    qua `vi2en` — dịch nó chỉ làm mất thông tin.
+  - Cụm danh tính được nhận diện bằng regex: các từ viết hoa liền nhau, có
+    thể có từ nối viết thường (`van`, `de`, `la`…) để giữ trọn "Vincent van Gogh".
+    Dấu gạch nối **có khoảng trắng** (`" - "`) **không** nối từ, vì định dạng
+    evidence là `{title} - {artist}, {year}` -> "Biglin Brothers" và
+    "Thomas Eakins" phải là hai cụm riêng.
+  - Từ đơn nằm trong danh sách từ thường gặp (`_COMMON_WORDS`) hoặc từ chức
+    năng (`_NAME_STOP_STARTERS`) -> **không** phải tên riêng, được dịch bình
+    thường (tránh việc "Two men rowing a boat" bị chặn).
+  - Nhãn citation `[IMG-xx]` được giữ nguyên (có cơ chế bảo vệ riêng ở
+    `split_segments`), không bị `protect_names` đụng tới.
 - Cache dịch: `data/cache/translate`, khoá `sha256(model|văn bản)`.
 - **Hạn chế đã biết**: FLAN-T5-base **không từ chối được** — với bằng chứng thiếu
   nó **bịa** (vd. đấu giá "$500.000"). Vì vậy logic abstain **không** được đặt
@@ -586,7 +614,7 @@ Kết luận:
 | model | thiết bị | dtype | VRAM thực đo (MB) | est_vram_mb | tokens/giây | kết quả thử |
 |---|---|---|---|---|---|---|
 | flan_t5 (`google/flan-t5-base`) | cuda | fp32 | 947 | 1 000 | ~1,7–1,9 | "Thomas Eakins [IMG-01]" |
-| vi2en / en2vi (vinai, MBart) | cpu | fp32 | – (RAM) | 900 | – | dịch đúng, giữ nguyên nhãn |
+| vi2en / en2vi (vinai, MBart) | cpu | fp32 | – (RAM) | 900 | – | dịch đúng, giữ nguyên nhãn **và tên riêng** |
 
 Ghi chú:
 - Latency của một lần hỏi (nạp model xong): sinh câu trả lời ~3–7 s, lượt 2
