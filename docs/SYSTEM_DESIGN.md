@@ -185,8 +185,8 @@ data/                         # gitignore; gốc lấy từ ARTRAG_DATA_DIR (m�
   kb/{artworks,artists,chunks}.parquet
   images/{artwork_id}.jpg         # RGB, cạnh dài 512px, JPEG q=90
   images_failed.json               # artwork_id -> lý do lỗi tải ảnh (ở gốc data/, ngoài images/)
-  index/clip-{tag}/{emb.npy, ids.json, faiss.index, meta.json}
-  index/text-{tag}/{emb.npy, ids.json, faiss.index, meta.json}
+  index/clip/{emb.npy, ids.json, meta.json}
+  index/text/{emb.npy, ids.json, meta.json}
   cache/captions-{tag}.parquet
   cache/llm/                      # diskcache: phản hồi LLM
   cache/translate/                # diskcache: kết quả dịch
@@ -194,6 +194,14 @@ data/                         # gitignore; gốc lấy từ ARTRAG_DATA_DIR (m�
 results/{experiment}/{predictions.jsonl, metrics.json, config.yaml}
 ```
 `meta.json` của mỗi index gồm: model id, revision, dim, n, `kb_hash` (hash của `ids`/nội dung nguồn), created_at, thời gian build. Khi online, nếu `kb_hash` lệch so với KB hiện tại thì báo lỗi `StaleIndexError` kèm lệnh build lại.
+
+**Cài đặt index (bổ sung 2026-11-28, T3.1–T3.3)** — package `src/artrag/index/`:
+- `vector_index.py`: lớp `VectorIndex` — `build(vectors, ids, meta)` / `save(dir)` / `load(dir, expected_kb_hash=...)` / `search(query, k) -> list[(id, score)]`. Dùng FAISS `IndexFlatIP`; vì vector đã L2-normalize nên điểm inner product **chính là cosine similarity**.
+- **Không serialize file FAISS**: với ~2.210 vector ảnh và ~10.500 chunk, tìm kiếm chính xác dưới 1 ms nên `IndexFlatIP` được **dựng lại từ `emb.npy`** mỗi lần load (vài ms). Giữ `emb.npy` giúp nạp lại nhanh, kiểm tra `dim`/`n` và dùng lại được cho ablation. Nếu mở rộng ≥100k vector thì chuyển sang serialize `faiss.index` (`IndexIVFFlat`/`IndexHNSWFlat`) — điểm này nêu trong phần khả năng mở rộng của báo cáo.
+- `kb_hash` của index **tái sử dụng đúng** `artrag.tools.artifacts.kb_fingerprint()` (hash ổn định của tập `(artwork_id, image_path)`) → `kb_hash` trong `meta.json` khớp `kb_hash` trong `manifest.json` của artefact.
+- `clip_index.py`: CLI `build | check | search "<text>"`. Batch size: `index.batch_size` (GPU, mặc định 64) và `index.batch_size_cpu` (CPU, mặc định 16). Template truy vấn lấy từ `query.clip_template` (mặc định `T1` = `"a painting of {q}"`).
+- `text_index.py`: CLI `build | check | search "<query>"` trên `kb/chunks.parquet` (BGE-M3, task `sbert`). Profile `local` đẩy `text_embed` về **CPU fp32** (~2,3 GB RAM) → build text index **rất chậm**, luôn dùng `--limit` nhỏ khi thử.
+- `captions.py`: CLI `build | check` sinh caption BLIP (`blip_cap`, beam 3, `max_new_tokens` 30 — khoá `index.caption_model` / `index.caption_num_beams` / `index.caption_max_new_tokens`) ghi vào `data/cache/captions-{tag}.parquet` với schema `artwork_id, model, params_hash, caption, ms`. `tag` = hash của `(model, params_hash)` nên các biến thể không đè lên nhau; lệnh `build` **chỉ caption ảnh chưa có** (idempotent) trừ khi `--force`.
 
 **Phân phối artefact**: `python -m artrag.tools.artifacts pack` nén `kb/ images/ index/ cache/captions*` thành `artifacts.zip` (khoảng 450MB) để đưa lên Google Drive hoặc Kaggle Dataset; lệnh `unpack` giải nén ở máy local. README có hướng dẫn tái tạo đầy đủ từ đầu (fetch → build → index).
 

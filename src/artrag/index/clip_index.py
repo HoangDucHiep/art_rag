@@ -43,7 +43,6 @@ CLIP_INDEX_SUBDIR = "clip"
 #: Batch size mặc định cho GPU / CPU (đọc từ config `index.batch_size`).
 DEFAULT_BATCH_SIZE = 64
 DEFAULT_CPU_BATCH_SIZE = 16
-
 #: Số kết quả mặc định của lệnh `search`.
 DEFAULT_TOP_K = 5
 
@@ -64,10 +63,13 @@ def _cfg_get(cfg: Config, key: str, default: Any) -> Any:
 
 
 def batch_size_for(cfg: Config, device: str) -> int:
-    """Batch size theo thiết bị: `index.batch_size` cho GPU, 16 cho CPU."""
+    """Batch size theo thiết bị: `index.batch_size` cho GPU, `index.batch_size_cpu` cho CPU."""
     configured = int(_cfg_get(cfg, "batch_size", DEFAULT_BATCH_SIZE) or DEFAULT_BATCH_SIZE)
     if str(device).startswith("cpu"):
-        return max(1, min(configured, DEFAULT_CPU_BATCH_SIZE))
+        cpu_batch = int(
+            _cfg_get(cfg, "batch_size_cpu", DEFAULT_CPU_BATCH_SIZE) or DEFAULT_CPU_BATCH_SIZE
+        )
+        return max(1, min(configured, cpu_batch))
     return max(1, configured)
 
 

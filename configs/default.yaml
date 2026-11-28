@@ -61,6 +61,10 @@ index:
   clip_model: clip
   text_model: text_embed
   batch_size: 64
+  batch_size_cpu: 16
+  caption_model: blip_cap
+  caption_max_new_tokens: 30
+  caption_num_beams: 3
   caption_model: blip_cap
   caption_max_new_tokens: 30
   caption_num_beams: 3
