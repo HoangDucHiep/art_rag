@@ -5,6 +5,7 @@ artifacts*.zip
 
 # Kết quả thí nghiệm lớn
 results/**/predictions.jsonl
+results/offline_build.md
 
 # Secrets
 .env
