@@ -3,6 +3,9 @@
 /data/
 artifacts*.zip
 
+# Thư mục tạm của agent (artefact nén, staging Kaggle dataset) — không commit
+/.agent_tmp/
+
 # Kết quả thí nghiệm lớn
 results/**/predictions.jsonl
 results/offline_build.md
